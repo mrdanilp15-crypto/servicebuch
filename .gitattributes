@@ -1,0 +1,7 @@
+# Erzwingt konsistente Zeilenenden unabhängig von der lokalen
+# core.autocrlf-Einstellung - wichtig, damit start.sh/stop.sh nach einem
+# Checkout auf macOS/Linux nicht mit CRLF-Shebang-Fehlern brechen.
+* text=auto eol=lf
+
+*.bat text eol=crlf
+*.sh  text eol=lf
