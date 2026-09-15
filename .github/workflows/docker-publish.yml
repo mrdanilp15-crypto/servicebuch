@@ -76,14 +76,30 @@ jobs:
               if curl -sf http://localhost:4000/api/health >/dev/null; then ok=1; break; fi
               sleep 2
             done
-            echo "--- $platform container logs ---"
-            docker logs "$name" || true
-            docker rm -f "$name" || true
             if [ -z "$ok" ]; then
+              echo "--- $platform container logs ---"
+              docker logs "$name" || true
+              docker rm -f "$name" || true
               echo "::error::Backend-Image ($platform) ist nicht gesund geworden (siehe Logs oben) - wird NICHT als :latest veröffentlicht."
               exit 1
             fi
-            echo "$platform OK"
+            # /api/health prüft nur, dass der Prozess läuft - registriert
+            # aber testet den kompletten Pfad inkl. Argon2 (natives Modul!)
+            # und einem echten Prisma-Datenbank-Write, nicht nur "lädt".
+            reg_code=$(curl -s -o /tmp/register_response.json -w "%{http_code}" \
+              -X POST http://localhost:4000/api/auth/register \
+              -H "Content-Type: application/json" \
+              -d '{"email":"smoketest@example.com","password":"SmokeTest123!","name":"Smoke Test"}')
+            echo "--- $platform container logs ---"
+            docker logs "$name" || true
+            docker rm -f "$name" || true
+            if [ "$reg_code" != "201" ]; then
+              echo "--- register response ---"
+              cat /tmp/register_response.json || true
+              echo "::error::Backend-Image ($platform): POST /api/auth/register lieferte HTTP $reg_code statt 201 (siehe Logs/Response oben) - wird NICHT als :latest veröffentlicht."
+              exit 1
+            fi
+            echo "$platform OK (health + register/Argon2/Prisma-Write)"
           done
           echo "Backend-Smoke-Test erfolgreich (amd64 + arm64)."
 
