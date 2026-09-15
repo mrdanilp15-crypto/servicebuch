@@ -150,22 +150,35 @@ jobs:
 
       - name: Full-stack test (Frontend-Proxy -> Backend über Docker-Netzwerk)
         run: |
-          set -e
+          set -x
           docker network create sb-test-net
 
           docker run -d --name sb-test-backend --network sb-test-net \
             -e DATABASE_URL=file:/app/data/dev.db \
             -e DATA_DIR=/app/data \
             ghcr.io/${{ github.repository_owner }}/servicebuch-backend:${{ github.sha }}
+          echo "backend docker run exit: $?"
 
           docker run -d --name sb-test-frontend --network sb-test-net \
             -e BACKEND_INTERNAL_URL=http://sb-test-backend:4000 \
             -p 3000:3000 \
             ghcr.io/${{ github.repository_owner }}/servicebuch-frontend:${{ github.sha }}
+          echo "frontend docker run exit: $?"
+
+          docker ps -a
+          sleep 3
+          docker ps -a
+          echo "--- backend logs (early) ---"
+          docker logs sb-test-backend || true
+          echo "--- frontend logs (early) ---"
+          docker logs sb-test-frontend || true
 
           ok=""
           for i in $(seq 1 30); do
-            if docker exec sb-test-backend wget -q --spider http://localhost:4000/api/health; then ok=1; break; fi
+            docker exec sb-test-backend wget -q --spider http://localhost:4000/api/health
+            code=$?
+            echo "health check attempt $i exit: $code"
+            if [ "$code" = "0" ]; then ok=1; break; fi
             sleep 2
           done
           if [ -z "$ok" ]; then
