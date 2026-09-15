@@ -6,6 +6,11 @@ version: '3.8'
 # Portainer (Stacks -> Add stack -> Web editor) einfügen und deployen -
 # Portainer zieht dann nur die Images, baut nichts selbst.
 #
+# "pull_policy: always" sorgt dafür, dass bei JEDEM Deploy/Redeploy des
+# Stacks wirklich der aktuelle ":latest"-Stand aus der Registry gezogen
+# wird, statt ein evtl. bereits lokal vorhandenes (z.B. altes/kaputtes)
+# Image unter demselben Tag weiterzuverwenden.
+#
 # Keine Umgebungsvariablen sind Pflicht. JWT_SECRET, UPLOAD_ENCRYPTION_KEY
 # und die Web-Push-VAPID-Keys generiert das Backend beim allerersten Start
 # selbst und speichert sie im Volume "servicebuch_data", damit sie über
@@ -23,6 +28,7 @@ version: '3.8'
 services:
   backend:
     image: ghcr.io/mrdanilp15-crypto/servicebuch-backend:latest
+    pull_policy: always
     restart: unless-stopped
     ports:
       - '4000:4000'
@@ -49,6 +55,7 @@ services:
 
   frontend:
     image: ghcr.io/mrdanilp15-crypto/servicebuch-frontend:latest
+    pull_policy: always
     restart: unless-stopped
     ports:
       - '3000:3000'
