@@ -12,6 +12,9 @@ backend/uploads/*
 backend/prisma/dev.db
 backend/prisma/dev.db-journal
 backend/prisma/migrations/dev/
+# Auto-generierte Secrets (JWT/Upload-Key/VAPID) + lokale SQLite-DB, siehe
+# backend/src/utils/secrets.js - werden bei jedem Start automatisch erzeugt.
+backend/data/
 
 # Frontend / Next.js
 frontend/.next/

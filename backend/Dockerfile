@@ -3,7 +3,9 @@ FROM node:18-alpine
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install --omit=dev
+# Devdependencies werden bewusst mitinstalliert: die Prisma CLI (für
+# "migrate deploy" beim Container-Start) liegt in devDependencies.
+RUN npm ci
 
 COPY prisma ./prisma
 RUN npx prisma generate

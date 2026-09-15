@@ -1,8 +1,19 @@
 version: '3.8'
 
-# Einfaches Deployment mit SQLite (Standard) - keine externe Datenbank nötig.
-# Für Postgres: DATABASE_URL anpassen, provider in backend/prisma/schema.prisma
-# auf "postgresql" ändern und einen db-Service ergänzen (siehe README).
+# Zero-Config-Deployment: einfach "docker compose up -d --build" ausführen
+# (oder start.bat / start.sh doppelklicken) - keine .env-Datei, keine
+# manuell erzeugten Secrets nötig. JWT_SECRET, UPLOAD_ENCRYPTION_KEY und die
+# Web-Push-VAPID-Keys werden vom Backend beim allerersten Start automatisch
+# generiert und im Docker-Volume "servicebuch_data" gespeichert, sodass sie
+# bei jedem weiteren Start erhalten bleiben.
+#
+# SQLite (Standard) läuft ohne externe Datenbank. Für Postgres: DATABASE_URL
+# anpassen, provider in backend/prisma/schema.prisma auf "postgresql" ändern
+# und einen db-Service ergänzen (siehe README).
+#
+# Alle Werte unten sind optional überschreibbar, z.B. über eine .env-Datei
+# neben dieser docker-compose.yml (gleicher Ordner, Format KEY=VALUE pro
+# Zeile) - nötig ist das aber nicht.
 
 services:
   backend:
@@ -15,11 +26,12 @@ services:
       PORT: 4000
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       DATABASE_URL: file:/app/data/dev.db
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET muss gesetzt sein}
+      DATA_DIR: /app/data
+      JWT_SECRET: ${JWT_SECRET:-}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
       UPLOAD_DIR: /app/uploads
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-15}
-      UPLOAD_ENCRYPTION_KEY: ${UPLOAD_ENCRYPTION_KEY:?UPLOAD_ENCRYPTION_KEY muss gesetzt sein (64 Hex-Zeichen)}
+      UPLOAD_ENCRYPTION_KEY: ${UPLOAD_ENCRYPTION_KEY:-}
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@example.com}
@@ -28,6 +40,12 @@ services:
     volumes:
       - servicebuch_data:/app/data
       - servicebuch_uploads:/app/uploads
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://localhost:4000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
   frontend:
     build:
@@ -38,7 +56,8 @@ services:
     ports:
       - '3000:3000'
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
 volumes:
   servicebuch_data:

@@ -4,6 +4,25 @@ Ein vollständiges, mobile-optimiertes digitales Servicebuch fürs Auto: Fahrzeu
 Service-Historie mit Belegen, PDF-Export, Kilometerstand-Tracking und Push-Erinnerungen
 (TÜV, Ölwechsel, Service-Intervalle, Reifenwechsel).
 
+## Sofort starten (keine Konfiguration nötig)
+
+Einzige Voraussetzung: [Docker Desktop](https://www.docker.com/products/docker-desktop/) ist
+installiert und läuft. Dann:
+
+- **Windows**: [`start.bat`](start.bat) doppelklicken
+- **macOS/Linux**: [`start.sh`](start.sh) doppelklicken (oder `./start.sh` im Terminal)
+
+Das Skript baut die Container, startet sie und öffnet automatisch den Browser unter
+`http://localhost:3000`, sobald alles bereit ist. Es gibt keine `.env`-Datei zu kopieren und
+keine Secrets zu erzeugen – JWT-Signaturschlüssel, Verschlüsselungskey für Uploads und die
+Web-Push-Schlüssel werden vom Backend beim allerersten Start automatisch erzeugt und in einem
+Docker-Volume gespeichert, sodass sie bei jedem weiteren Start erhalten bleiben. Zum Beenden:
+`stop.bat` bzw. `stop.sh` doppelklicken.
+
+Danach: registrieren (der erste Account wird automatisch Admin) und loslegen. Ohne Docker geht
+es auch – siehe [„Manuelle Installation ohne Docker"](#manuelle-installation-ohne-docker) weiter
+unten.
+
 ## Tech-Stack
 
 | Bereich    | Technologie                                                        |
@@ -35,6 +54,8 @@ Servicebuch/
 │       ├── components/        UI-Komponenten inkl. Fahrzeug-Tabs
 │       └── lib/               API-Client
 ├── docker-compose.yml
+├── start.bat / start.sh      Doppelklick-Starter (Docker Compose, zero-config)
+├── stop.bat / stop.sh        Stoppt die App wieder
 └── README.md
 ```
 
@@ -55,41 +76,28 @@ Servicebuch/
 - **Sicherheit**: JWT-Auth, Argon2id Passwort-Hashing, Uploads AES-256-GCM-verschlüsselt at rest,
   Rate-Limiting, Helmet-Security-Header.
 
-## Voraussetzungen
+## Manuelle Installation ohne Docker
 
-- Node.js ≥ 18
-- npm
+Für die Weiterentwicklung am Code (nicht nötig, wenn du nur die App nutzen willst – dafür siehe
+oben).
 
-## Schnellstart (lokal)
+Voraussetzungen: Node.js ≥ 18, npm.
 
 ### 1. Backend
 
 ```bash
 cd backend
 cp .env.example .env
-```
-
-In `backend/.env` folgende Werte setzen:
-
-- `JWT_SECRET`: ein langer, zufälliger String
-- `UPLOAD_ENCRYPTION_KEY`: 32-Byte-Hex-Schlüssel, erzeugen mit:
-  ```bash
-  node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-  ```
-- `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY`: erzeugen mit:
-  ```bash
-  npm install
-  npm run vapid:generate
-  ```
-
-Dann Datenbank initialisieren und Server starten:
-
-```bash
 npm install
 npm run prisma:migrate -- --name init
 npm run seed        # optional: Beispieldaten
 npm run dev
 ```
+
+`JWT_SECRET`, `UPLOAD_ENCRYPTION_KEY` und die VAPID-Keys müssen in `.env` **nicht** gesetzt
+werden – sie werden beim ersten Start automatisch generiert und in `backend/data/.secrets.json`
+gespeichert (siehe `backend/src/utils/secrets.js`). Nur `DATABASE_URL` muss vorhanden sein
+(steht schon per Default in `.env.example`).
 
 Die API läuft auf `http://localhost:4000`. Health-Check: `GET /api/health`.
 
@@ -171,42 +179,43 @@ App).
 - Hochgeladene Dateien (Rechnungen, Fotos, Tacho-Bilder) werden vor dem Schreiben auf die
   Festplatte mit **AES-256-GCM** verschlüsselt (`UPLOAD_ENCRYPTION_KEY`) und nur über die
   authentifizierte Route `GET /api/attachments/:id` entschlüsselt ausgeliefert.
+- `JWT_SECRET`, `UPLOAD_ENCRYPTION_KEY` und die VAPID-Keys werden beim ersten Start automatisch
+  generiert (`backend/src/utils/secrets.js`) und in `data/.secrets.json` (Docker-Volume bzw.
+  `backend/data/` lokal) gespeichert – diese Datei ist der "Tresor" der Installation und wird
+  nie ins Repository committet (siehe `.gitignore`). Bei einem Neustart mit leerem Volume
+  werden neue Secrets erzeugt; bestehende JWT-Tokens werden dann ungültig und verschlüsselte
+  Alt-Uploads lassen sich nicht mehr entschlüsseln – das Volume also nicht versehentlich löschen.
 - Rate-Limiting auf Auth-Routen und global über `express-rate-limit`, Security-Header über
   `helmet`.
-- **Wichtig**: `.env`-Dateien und der `UPLOAD_ENCRYPTION_KEY` dürfen niemals ins Repository
-  committet werden (siehe `.gitignore`).
 
 ## Deployment
 
 ### Option A: Docker Compose (empfohlen für Selbst-Hosting)
 
 ```bash
-export JWT_SECRET=$(node -e "console.log(require('crypto').randomBytes(48).toString('hex'))")
-export UPLOAD_ENCRYPTION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
-# VAPID Keys einmalig lokal erzeugen (siehe oben, npm run vapid:generate) und exportieren:
-export VAPID_PUBLIC_KEY=...
-export VAPID_PRIVATE_KEY=...
-
 docker compose up -d --build
 ```
 
-Backend läuft auf Port 4000, Frontend auf Port 3000. SQLite-Datenbank und Uploads liegen in
-benannten Docker-Volumes (`servicebuch_data`, `servicebuch_uploads`) und bleiben über Neustarts
-hinweg erhalten. Für eine öffentliche Domain zusätzlich einen Reverse Proxy (z. B. Nginx,
-Caddy oder Traefik) mit TLS-Zertifikat vor beide Services schalten – Web Push benötigt HTTPS.
+(oder einfach `start.bat` / `start.sh` doppelklicken, siehe oben). Es müssen keine
+Umgebungsvariablen gesetzt werden – Backend läuft auf Port 4000, Frontend auf Port 3000.
+SQLite-Datenbank, Uploads und die automatisch generierten Secrets liegen in benannten
+Docker-Volumes (`servicebuch_data`, `servicebuch_uploads`) und bleiben über Neustarts hinweg
+erhalten (`docker compose down` behält die Volumes, `docker compose down -v` löscht sie).
 
-**Migrationen für Docker vorbereiten**: Bevor `docker compose up` das erste Mal läuft, müssen
-lokal Prisma-Migrationsdateien erzeugt werden (die dann Teil des Docker-Images sind):
-
-```bash
-cd backend
-npm run prisma:migrate -- --name init
-```
+Für eine öffentliche Domain zusätzlich einen Reverse Proxy (z. B. Nginx, Caddy oder Traefik) mit
+TLS-Zertifikat vor beide Services schalten – Web Push benötigt HTTPS. Optional lassen sich
+einzelne Werte überschreiben, z. B. über eine `.env`-Datei neben `docker-compose.yml` (siehe
+Variablen in `docker-compose.yml`, u. a. `NEXT_PUBLIC_API_URL` für eine andere Domain als
+`localhost`).
 
 ### Option B: Manuelles Deployment (z. B. VPS, Render, Railway, Fly.io)
 
-1. **Backend**: `npm ci`, `npx prisma migrate deploy`, `npm start`. Alle Variablen aus
-   `.env.example` als Umgebungsvariablen setzen. Für Postgres/MySQL statt SQLite:
+1. **Backend**: `npm ci`, `npx prisma migrate deploy`, `npm start`. Nur `DATABASE_URL` muss
+   gesetzt sein – `JWT_SECRET`, `UPLOAD_ENCRYPTION_KEY` und die VAPID-Keys generieren sich beim
+   ersten Start selbst (siehe oben). Wichtig: `DATA_DIR` auf ein persistentes Volume zeigen
+   lassen, damit die generierten Secrets einen Neustart/Redeploy überleben – sonst werden bei
+   jedem Deploy neue erzeugt und alte JWT-Tokens/verschlüsselte Uploads ungültig. Für
+   Postgres/MySQL statt SQLite:
    - `backend/prisma/schema.prisma`: `provider = "postgresql"` (bzw. `"mysql"`)
    - `DATABASE_URL` auf die Verbindungszeichenfolge des Anbieters setzen
    - `npx prisma migrate deploy` erneut ausführen

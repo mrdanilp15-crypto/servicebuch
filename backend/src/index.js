@@ -1,4 +1,12 @@
 require('dotenv').config();
+const { ensureSecrets } = require('./utils/secrets');
+
+// Muss vor allen anderen require()s laufen: erzeugt bei Bedarf JWT_SECRET,
+// UPLOAD_ENCRYPTION_KEY und VAPID-Keys, bevor Module wie utils/jwt.js beim
+// Laden darauf zugreifen. Dadurch startet die App ohne jede manuelle
+// .env-Konfiguration (siehe utils/secrets.js).
+ensureSecrets();
+
 const app = require('./app');
 const { startScheduler } = require('./jobs/scheduler');
 const { ensureUploadDir } = require('./services/storage.service');
