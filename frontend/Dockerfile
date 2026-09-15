@@ -3,13 +3,17 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
-ARG NEXT_PUBLIC_API_URL=http://localhost:4000/api
-ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 RUN npm run build
 
 FROM node:18-alpine
 WORKDIR /app
 ENV NODE_ENV=production
+# Default passt zum Service-Namen "backend" in docker-compose.yml. Wird zur
+# Laufzeit gelesen (next.config.js), lässt sich also ohne Rebuild per
+# "docker run -e BACKEND_INTERNAL_URL=..." bzw. Portainer-Stack-Env
+# überschreiben - z.B. wenn Backend und Frontend nicht im selben
+# Compose-Netzwerk laufen.
+ENV BACKEND_INTERNAL_URL=http://backend:4000
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public

@@ -14,20 +14,26 @@ Danach nur noch: registrieren (der erste Account wird automatisch Admin) und los
 
 ### Option A: Portainer (Server / NAS / Homelab)
 
+Backend und Frontend werden automatisch bei jedem Push nach `main` als fertige Images gebaut
+und nach GitHub Container Registry veröffentlicht (`.github/workflows/docker-publish.yml`,
+öffentlich abrufbar unter `ghcr.io/mrdanilp15-crypto/servicebuch-backend` bzw. `-frontend`).
+`docker-compose.yml` referenziert diese Images direkt (`image:`, kein `build:`) – Portainer
+baut also nichts selbst, sondern zieht nur die fertigen Images.
+
 1. Portainer → **Stacks** → **Add stack**
 2. Name vergeben (z. B. `servicebuch`)
-3. Build method: **Repository**
-4. Repository URL: `https://github.com/mrdanilp15-crypto/servicebuch`
-5. Repository reference: `refs/heads/main`
-6. Compose path: `docker-compose.yml`
-7. Optional: **GitOps updates** aktivieren (Polling oder Webhook) – dann redeployed Portainer
-   den Stack automatisch bei jedem Push auf `main`, ganz ohne Zutun.
-8. **Deploy the stack**
+3. Build method: **Web editor**
+4. Inhalt von [`docker-compose.yml`](docker-compose.yml) hineinkopieren
+5. **Deploy the stack**
 
-Portainer klont das Repo, baut Backend- und Frontend-Image selbst (Dockerfiles sind im Repo)
-und startet beide Container. Danach läuft die App unter `http://<server-ip>:3000`. Es ist
-nichts weiter einzutragen – keine der Umgebungsvariablen in `docker-compose.yml` ist
-Pflicht, alle haben Defaults bzw. generieren sich selbst.
+Fertig – kein Registry-Login nötig (die Images sind öffentlich), keine Umgebungsvariablen
+auszufüllen, kein Build auf deinem Server/NAS. Die App läuft danach unter
+`http://<server-ip>:3000`. Ein Redeploy des Stacks in Portainer (Button **Pull and redeploy**,
+oder ein Webhook dafür) zieht jeweils die neueste `:latest`-Version.
+
+Alternativ funktioniert auch **Build method: Repository** (Repo-URL + Compose-Pfad
+`docker-compose.yml`) – Portainer klont dann das Repo, findet aber trotzdem nur die
+`image:`-Referenzen und zieht ebenfalls nur die fertigen Images statt selbst zu bauen.
 
 ### Option B: Docker Desktop (eigener PC/Laptop)
 
@@ -50,6 +56,13 @@ docker compose up -d --build
 Ohne Docker geht es auch – siehe [„Manuelle Installation ohne Docker"](#manuelle-installation-ohne-docker)
 weiter unten.
 
+> **Warum bauen B und C lokal, Portainer aber nicht?** Neben `docker-compose.yml` liegt im Repo
+> auch [`docker-compose.override.yml`](docker-compose.override.yml). `docker compose` lädt diese
+> Datei automatisch mit, sobald sie im selben Ordner liegt (bei B/C, weil du das Repo geklont
+> hast), und baut dann aus dem Quellcode statt das Image zu pullen. Fügst du nur den Inhalt von
+> `docker-compose.yml` in Portainers Web Editor ein, existiert diese zweite Datei dort nicht –
+> Portainer zieht dann immer das fertige Image.
+
 ## Tech-Stack
 
 | Bereich    | Technologie                                                        |
@@ -66,25 +79,40 @@ weiter unten.
 
 ```
 Servicebuch/
-├── backend/                 Express API
-│   ├── prisma/               Datenmodell (schema.prisma) + Seed-Skript
+├── .github/workflows/         Baut & published Docker-Images nach ghcr.io bei jedem Push
+├── backend/                   Express API
+│   ├── prisma/                 Datenmodell (schema.prisma) + Seed-Skript
 │   └── src/
-│       ├── controllers/      Request-Handler
-│       ├── routes/           Express-Router
-│       ├── middleware/       Auth, Upload, Fehlerbehandlung
-│       ├── services/         PDF-, Push-, Storage-, Reminder-Logik
-│       ├── jobs/              Cron-Scheduler
-│       └── utils/            JWT, Datei-Verschlüsselung
-├── frontend/                 Next.js App (mobile-optimiert)
+│       ├── controllers/        Request-Handler
+│       ├── routes/             Express-Router
+│       ├── middleware/         Auth, Upload, Fehlerbehandlung
+│       ├── services/           PDF-, Push-, Storage-, Reminder-Logik
+│       ├── jobs/                Cron-Scheduler
+│       └── utils/              JWT, Datei-Verschlüsselung, Secrets-Bootstrap
+├── frontend/                   Next.js App (mobile-optimiert)
 │   └── src/
-│       ├── app/               Seiten (Login, Dashboard, Fahrzeuge, ...)
-│       ├── components/        UI-Komponenten inkl. Fahrzeug-Tabs
-│       └── lib/               API-Client
-├── docker-compose.yml
-├── start.bat / start.sh      Doppelklick-Starter (Docker Compose, zero-config)
-├── stop.bat / stop.sh        Stoppt die App wieder
+│       ├── app/                 Seiten (Login, Dashboard, Fahrzeuge, ...)
+│       ├── components/          UI-Komponenten inkl. Fahrzeug-Tabs
+│       └── lib/                 API-Client (ruft immer /api relativ auf)
+├── docker-compose.yml         Pullt fertige Images von ghcr.io (für Portainer & Produktion)
+├── docker-compose.override.yml  Baut lokal aus dem Quellcode (greift nur bei geklontem Repo)
+├── start.bat / start.sh       Doppelklick-Starter für Docker Desktop (lokal)
+├── stop.bat / stop.sh         Stoppt die App wieder
 └── README.md
 ```
+
+## Docker-Images
+
+| Image | Registry | Baut bei |
+| ----- | -------- | -------- |
+| Backend | `ghcr.io/mrdanilp15-crypto/servicebuch-backend:latest` | jedem Push auf `main` mit Änderungen in `backend/` |
+| Frontend | `ghcr.io/mrdanilp15-crypto/servicebuch-frontend:latest` | jedem Push auf `main` mit Änderungen in `frontend/` |
+
+Beide werden von [`.github/workflows/docker-publish.yml`](.github/workflows/docker-publish.yml)
+für `linux/amd64` und `linux/arm64` gebaut (läuft also auch auf Raspberry Pi / ARM-NAS) und sind
+öffentlich pullbar, kein Login nötig. Manuell auslösen: GitHub → Actions → „Build and publish
+Docker images" → **Run workflow**. Zusätzlich wird jedes Mal auch mit dem jeweiligen Commit-SHA
+als Tag veröffentlicht, falls du eine bestimmte Version statt `:latest` fixieren willst.
 
 ## Funktionsübersicht
 
@@ -146,9 +174,9 @@ Die App läuft auf `http://localhost:3000` und ist für mobile Viewports (Bottom
 Touch-optimierte Formulare) ausgelegt – am besten im Browser mit aktiviertem
 Mobile-Emulationsmodus testen, oder direkt auf dem Smartphone öffnen.
 
-Damit Web Push funktioniert, muss `NEXT_PUBLIC_API_URL` auf die Backend-URL zeigen und das
-Backend die VAPID-Keys gesetzt haben. Push-Benachrichtigungen lassen sich auf der
-Dashboard-Seite über den Schalter „Push-Benachrichtigungen aktivieren" einschalten.
+Push-Benachrichtigungen lassen sich auf der Dashboard-Seite über den Schalter
+„Push-Benachrichtigungen aktivieren" einschalten (VAPID-Keys generiert das Backend selbst,
+siehe unten).
 
 ## API-Überblick
 
@@ -227,9 +255,11 @@ alte Logins/verschlüsselte Uploads weg).
 
 Für eine öffentliche Domain zusätzlich einen Reverse Proxy (z. B. Nginx, Caddy, Traefik oder
 Portainers eigenes Ingress-Setup) mit TLS-Zertifikat vor beide Services schalten – Web Push
-benötigt HTTPS. Optional lassen sich einzelne Werte überschreiben (z. B. `NEXT_PUBLIC_API_URL`
-für eine andere Domain als `localhost`) – bei Portainer über die Environment-Variablen-Felder
-im Stack-Editor, bei reinem Compose über eine `.env`-Datei neben `docker-compose.yml`.
+benötigt HTTPS. `FRONTEND_URL` in `docker-compose.yml` auf die echte Domain anpassen (nur für
+CORS relevant). Die Backend-Adresse selbst muss **nicht** angepasst werden: das Frontend ruft
+immer `/api/...` relativ zur eigenen Domain auf, der Next.js-Server proxied das serverseitig
+zum `backend`-Container (siehe `BACKEND_INTERNAL_URL`, `frontend/next.config.js`) – das
+funktioniert unabhängig davon, unter welcher Domain/IP die App erreichbar ist, ohne Rebuild.
 
 ### Ohne Docker (z. B. VPS, Render, Railway, Fly.io)
 
@@ -243,7 +273,8 @@ im Stack-Editor, bei reinem Compose über eine `.env`-Datei neben `docker-compos
    - `DATABASE_URL` auf die Verbindungszeichenfolge des Anbieters setzen
    - `npx prisma migrate deploy` erneut ausführen
 2. **Frontend**: `npm ci`, `npm run build`, `npm start` (oder `next start`). Umgebungsvariable
-   `NEXT_PUBLIC_API_URL` auf die öffentliche Backend-URL setzen (Build-Zeit-Variable!).
+   `BACKEND_INTERNAL_URL` auf die (server-intern erreichbare) Backend-URL setzen – wird zur
+   Laufzeit gelesen, kein Rebuild nötig, siehe `frontend/next.config.js`.
 3. **Uploads**: `UPLOAD_DIR` auf ein persistentes Volume zeigen lassen (nicht auf ephemeren
    Storage bei PaaS-Anbietern ohne Volume-Unterstützung).
 4. **Reverse Proxy / HTTPS**: für Produktion zwingend erforderlich (Web Push, sichere Cookies

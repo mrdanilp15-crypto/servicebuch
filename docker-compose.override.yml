@@ -1,0 +1,14 @@
+# Wird von "docker compose" automatisch zusätzlich zu docker-compose.yml
+# geladen, wenn beide Dateien im selben Ordner liegen (lokal geklontes
+# Repo) - baut die Images aus dem Quellcode statt sie von ghcr.io zu
+# pullen. Genau das tun start.bat/start.sh bzw. "docker compose up -d
+# --build" lokal. Diese Datei existiert NICHT, wenn du nur den Inhalt von
+# docker-compose.yml in Portainers Web Editor einfuegst - dort wird also
+# immer das fertige Image gepullt.
+services:
+  backend:
+    build: ./backend
+
+  frontend:
+    build:
+      context: ./frontend

@@ -1,4 +1,10 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+// Immer ein relativer Pfad: der Next.js-Server proxied /api/* serverseitig
+// zum Backend (siehe next.config.js -> rewrites, gesteuert über die
+// Laufzeit-Variable BACKEND_INTERNAL_URL). Dadurch ist im Browser-Bundle
+// keine feste Backend-Adresse eingebacken - ein einmal gebautes Image
+// funktioniert unabhängig davon, unter welchem Hostnamen/welcher IP die
+// App später aufgerufen wird.
+const API_URL = '/api';
 
 function getToken() {
   if (typeof window === 'undefined') return null;

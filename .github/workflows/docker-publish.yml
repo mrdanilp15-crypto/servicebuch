@@ -1,0 +1,54 @@
+name: Build and publish Docker images
+
+# Baut backend/ und frontend/ als Docker-Images und veröffentlicht sie in
+# der GitHub Container Registry (ghcr.io) - genau die Images, die
+# docker-compose.yml per "image:" referenziert. Läuft automatisch bei
+# jedem Push auf main (nur wenn sich backend/, frontend/ oder dieser
+# Workflow geändert haben) und lässt sich zusätzlich manuell auslösen.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - '.github/workflows/docker-publish.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [backend, frontend]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU (für arm64-Builds, z.B. Raspberry Pi / ARM-NAS)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./${{ matrix.service }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/servicebuch-${{ matrix.service }}:latest
+            ghcr.io/${{ github.repository_owner }}/servicebuch-${{ matrix.service }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}

@@ -1,42 +1,42 @@
 version: '3.8'
 
-# Zero-Config-Deployment: einfach "docker compose up -d --build" ausführen
-# (oder start.bat / start.sh doppelklicken) - keine .env-Datei, keine
-# manuell erzeugten Secrets nötig. JWT_SECRET, UPLOAD_ENCRYPTION_KEY und die
-# Web-Push-VAPID-Keys werden vom Backend beim allerersten Start automatisch
-# generiert und im Docker-Volume "servicebuch_data" gespeichert, sodass sie
-# bei jedem weiteren Start erhalten bleiben.
+# Zero-Config-Deployment mit fertigen Images aus der GitHub Container
+# Registry (werden automatisch bei jedem Push auf "main" neu gebaut, siehe
+# .github/workflows/docker-publish.yml). Diese Datei lässt sich 1:1 in
+# Portainer (Stacks -> Add stack -> Web editor) einfügen und deployen -
+# Portainer zieht dann nur die Images, baut nichts selbst.
 #
-# SQLite (Standard) läuft ohne externe Datenbank. Für Postgres: DATABASE_URL
-# anpassen, provider in backend/prisma/schema.prisma auf "postgresql" ändern
-# und einen db-Service ergänzen (siehe README).
+# Keine Umgebungsvariablen sind Pflicht. JWT_SECRET, UPLOAD_ENCRYPTION_KEY
+# und die Web-Push-VAPID-Keys generiert das Backend beim allerersten Start
+# selbst und speichert sie im Volume "servicebuch_data", damit sie über
+# Neustarts/Redeploys hinweg erhalten bleiben.
 #
-# Alle Werte unten sind optional überschreibbar, z.B. über eine .env-Datei
-# neben dieser docker-compose.yml (gleicher Ordner, Format KEY=VALUE pro
-# Zeile) - nötig ist das aber nicht.
+# Eigene Domain statt localhost? FRONTEND_URL unten anpassen (nur für CORS
+# relevant, kein Rebuild nötig). SQLite (Standard) braucht keine externe
+# Datenbank - für Postgres/MySQL: DATABASE_URL anpassen, provider in
+# backend/prisma/schema.prisma ändern und einen db-Service ergänzen.
+#
+# Lokale Entwicklung mit dem geklonten Repo? docker-compose.override.yml
+# baut die Images automatisch aus dem Quellcode statt sie zu pullen, sobald
+# du "docker compose up -d --build" im Projektordner ausführst.
 
 services:
   backend:
-    build: ./backend
+    image: ghcr.io/mrdanilp15-crypto/servicebuch-backend:latest
     restart: unless-stopped
     ports:
       - '4000:4000'
     environment:
       NODE_ENV: production
       PORT: 4000
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      FRONTEND_URL: http://localhost:3000
       DATABASE_URL: file:/app/data/dev.db
       DATA_DIR: /app/data
-      JWT_SECRET: ${JWT_SECRET:-}
-      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
       UPLOAD_DIR: /app/uploads
-      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-15}
-      UPLOAD_ENCRYPTION_KEY: ${UPLOAD_ENCRYPTION_KEY:-}
-      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
-      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
-      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@example.com}
-      TUEV_WARNING_DAYS: ${TUEV_WARNING_DAYS:-30}
-      SERVICE_INTERVAL_KM_WARNING: ${SERVICE_INTERVAL_KM_WARNING:-1000}
+      MAX_UPLOAD_MB: 15
+      VAPID_SUBJECT: mailto:admin@example.com
+      TUEV_WARNING_DAYS: 30
+      SERVICE_INTERVAL_KM_WARNING: 1000
     volumes:
       - servicebuch_data:/app/data
       - servicebuch_uploads:/app/uploads
@@ -48,13 +48,13 @@ services:
       start_period: 20s
 
   frontend:
-    build:
-      context: ./frontend
-      args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000/api}
+    image: ghcr.io/mrdanilp15-crypto/servicebuch-frontend:latest
     restart: unless-stopped
     ports:
       - '3000:3000'
+    environment:
+      # Interner Docker-Netzwerkname des Backend-Service, siehe next.config.js
+      BACKEND_INTERNAL_URL: http://backend:4000
     depends_on:
       backend:
         condition: service_healthy
