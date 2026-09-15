@@ -6,22 +6,49 @@ Service-Historie mit Belegen, PDF-Export, Kilometerstand-Tracking und Push-Erinn
 
 ## Sofort starten (keine Konfiguration nötig)
 
-Einzige Voraussetzung: [Docker Desktop](https://www.docker.com/products/docker-desktop/) ist
-installiert und läuft. Dann:
+In allen drei Fällen gilt dasselbe: keine `.env`-Datei, keine Secrets, keine
+Umgebungsvariablen. JWT-Signaturschlüssel, Verschlüsselungskey für Uploads und die
+Web-Push-Schlüssel werden vom Backend beim allerersten Start automatisch erzeugt und in einem
+Docker-Volume gespeichert, sodass sie bei jedem weiteren Start/Redeploy erhalten bleiben.
+Danach nur noch: registrieren (der erste Account wird automatisch Admin) und loslegen.
+
+### Option A: Portainer (Server / NAS / Homelab)
+
+1. Portainer → **Stacks** → **Add stack**
+2. Name vergeben (z. B. `servicebuch`)
+3. Build method: **Repository**
+4. Repository URL: `https://github.com/mrdanilp15-crypto/servicebuch`
+5. Repository reference: `refs/heads/main`
+6. Compose path: `docker-compose.yml`
+7. Optional: **GitOps updates** aktivieren (Polling oder Webhook) – dann redeployed Portainer
+   den Stack automatisch bei jedem Push auf `main`, ganz ohne Zutun.
+8. **Deploy the stack**
+
+Portainer klont das Repo, baut Backend- und Frontend-Image selbst (Dockerfiles sind im Repo)
+und startet beide Container. Danach läuft die App unter `http://<server-ip>:3000`. Es ist
+nichts weiter einzutragen – keine der Umgebungsvariablen in `docker-compose.yml` ist
+Pflicht, alle haben Defaults bzw. generieren sich selbst.
+
+### Option B: Docker Desktop (eigener PC/Laptop)
 
 - **Windows**: [`start.bat`](start.bat) doppelklicken
 - **macOS/Linux**: [`start.sh`](start.sh) doppelklicken (oder `./start.sh` im Terminal)
 
-Das Skript baut die Container, startet sie und öffnet automatisch den Browser unter
-`http://localhost:3000`, sobald alles bereit ist. Es gibt keine `.env`-Datei zu kopieren und
-keine Secrets zu erzeugen – JWT-Signaturschlüssel, Verschlüsselungskey für Uploads und die
-Web-Push-Schlüssel werden vom Backend beim allerersten Start automatisch erzeugt und in einem
-Docker-Volume gespeichert, sodass sie bei jedem weiteren Start erhalten bleiben. Zum Beenden:
-`stop.bat` bzw. `stop.sh` doppelklicken.
+Das Skript ruft im Hintergrund `docker compose up -d --build` auf, wartet auf den
+Health-Check und öffnet automatisch den Browser unter `http://localhost:3000`. Zum Beenden:
+`stop.bat` bzw. `stop.sh` doppelklicken. (Für Portainer sind diese Skripte irrelevant – dort
+zählt nur `docker-compose.yml`, siehe Option A.)
 
-Danach: registrieren (der erste Account wird automatisch Admin) und loslegen. Ohne Docker geht
-es auch – siehe [„Manuelle Installation ohne Docker"](#manuelle-installation-ohne-docker) weiter
-unten.
+### Option C: Nur die Compose-Datei (jeder andere Docker-Host)
+
+```bash
+git clone https://github.com/mrdanilp15-crypto/servicebuch.git
+cd servicebuch
+docker compose up -d --build
+```
+
+Ohne Docker geht es auch – siehe [„Manuelle Installation ohne Docker"](#manuelle-installation-ohne-docker)
+weiter unten.
 
 ## Tech-Stack
 
@@ -188,27 +215,23 @@ App).
 - Rate-Limiting auf Auth-Routen und global über `express-rate-limit`, Security-Header über
   `helmet`.
 
-## Deployment
+## Deployment in Produktion
 
-### Option A: Docker Compose (empfohlen für Selbst-Hosting)
+Alle drei Docker-Wege oben (Portainer, Docker Desktop, `docker compose up -d --build`) landen
+auf demselben Ergebnis: Backend auf Port 4000, Frontend auf Port 3000, SQLite-Datenbank,
+Uploads und die automatisch generierten Secrets liegen in benannten Docker-Volumes
+(`servicebuch_data`, `servicebuch_uploads`) und bleiben über Neustarts/Redeploys hinweg
+erhalten (`docker compose down` bzw. das Entfernen des Portainer-Stacks behält die Volumes,
+ein explizites Löschen der Volumes bzw. `docker compose down -v` löscht sie – dann sind auch
+alte Logins/verschlüsselte Uploads weg).
 
-```bash
-docker compose up -d --build
-```
+Für eine öffentliche Domain zusätzlich einen Reverse Proxy (z. B. Nginx, Caddy, Traefik oder
+Portainers eigenes Ingress-Setup) mit TLS-Zertifikat vor beide Services schalten – Web Push
+benötigt HTTPS. Optional lassen sich einzelne Werte überschreiben (z. B. `NEXT_PUBLIC_API_URL`
+für eine andere Domain als `localhost`) – bei Portainer über die Environment-Variablen-Felder
+im Stack-Editor, bei reinem Compose über eine `.env`-Datei neben `docker-compose.yml`.
 
-(oder einfach `start.bat` / `start.sh` doppelklicken, siehe oben). Es müssen keine
-Umgebungsvariablen gesetzt werden – Backend läuft auf Port 4000, Frontend auf Port 3000.
-SQLite-Datenbank, Uploads und die automatisch generierten Secrets liegen in benannten
-Docker-Volumes (`servicebuch_data`, `servicebuch_uploads`) und bleiben über Neustarts hinweg
-erhalten (`docker compose down` behält die Volumes, `docker compose down -v` löscht sie).
-
-Für eine öffentliche Domain zusätzlich einen Reverse Proxy (z. B. Nginx, Caddy oder Traefik) mit
-TLS-Zertifikat vor beide Services schalten – Web Push benötigt HTTPS. Optional lassen sich
-einzelne Werte überschreiben, z. B. über eine `.env`-Datei neben `docker-compose.yml` (siehe
-Variablen in `docker-compose.yml`, u. a. `NEXT_PUBLIC_API_URL` für eine andere Domain als
-`localhost`).
-
-### Option B: Manuelles Deployment (z. B. VPS, Render, Railway, Fly.io)
+### Ohne Docker (z. B. VPS, Render, Railway, Fly.io)
 
 1. **Backend**: `npm ci`, `npx prisma migrate deploy`, `npm start`. Nur `DATABASE_URL` muss
    gesetzt sein – `JWT_SECRET`, `UPLOAD_ENCRYPTION_KEY` und die VAPID-Keys generieren sich beim
