@@ -1,10 +1,13 @@
 name: Build and publish Docker images
 
-# Baut backend/ und frontend/ als Docker-Images und veröffentlicht sie in
-# der GitHub Container Registry (ghcr.io) - genau die Images, die
-# docker-compose.yml per "image:" referenziert. Läuft automatisch bei
-# jedem Push auf main (nur wenn sich backend/, frontend/ oder dieser
-# Workflow geändert haben) und lässt sich zusätzlich manuell auslösen.
+# Baut backend/ und frontend/ als Docker-Images, startet sie testweise und
+# veröffentlicht sie erst dann als ":latest" in der GitHub Container
+# Registry (ghcr.io) - genau die Images, die docker-compose.yml per
+# "image:" referenziert. Ein Image, das den Smoke-Test nicht besteht,
+# landet NIE auf ":latest" (nur unter dem Commit-SHA-Tag, zur Diagnose).
+# Läuft automatisch bei jedem Push auf main (nur wenn sich backend/,
+# frontend/ oder dieser Workflow geändert haben) und lässt sich
+# zusätzlich manuell auslösen.
 on:
   push:
     branches: [main]
@@ -41,14 +44,66 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push
+      # Nur mit dem Commit-SHA getaggt - ":latest" wird erst unten gesetzt,
+      # wenn der Smoke-Test erfolgreich war.
+      - name: Build and push (SHA tag only)
         uses: docker/build-push-action@v5
         with:
           context: ./${{ matrix.service }}
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/servicebuch-${{ matrix.service }}:latest
-            ghcr.io/${{ github.repository_owner }}/servicebuch-${{ matrix.service }}:${{ github.sha }}
+          tags: ghcr.io/${{ github.repository_owner }}/servicebuch-${{ matrix.service }}:${{ github.sha }}
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
+      - name: Smoke test backend image
+        if: matrix.service == 'backend'
+        run: |
+          set -e
+          docker run -d --name smoke \
+            -e DATABASE_URL=file:/app/data/dev.db \
+            -e DATA_DIR=/app/data \
+            -p 4000:4000 \
+            ghcr.io/${{ github.repository_owner }}/servicebuch-backend:${{ github.sha }}
+          ok=""
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:4000/api/health >/dev/null; then ok=1; break; fi
+            sleep 2
+          done
+          echo "--- container logs ---"
+          docker logs smoke || true
+          docker rm -f smoke || true
+          if [ -z "$ok" ]; then
+            echo "::error::Backend-Image ist nicht gesund geworden (siehe Logs oben) - wird NICHT als :latest veröffentlicht."
+            exit 1
+          fi
+          echo "Backend-Smoke-Test erfolgreich."
+
+      - name: Smoke test frontend image
+        if: matrix.service == 'frontend'
+        run: |
+          set -e
+          docker run -d --name smoke -p 3000:3000 \
+            ghcr.io/${{ github.repository_owner }}/servicebuch-frontend:${{ github.sha }}
+          ok=""
+          for i in $(seq 1 20); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/login || true)
+            if [ "$code" = "200" ]; then ok=1; break; fi
+            sleep 2
+          done
+          echo "--- container logs ---"
+          docker logs smoke || true
+          docker rm -f smoke || true
+          if [ -z "$ok" ]; then
+            echo "::error::Frontend-Image liefert /login nicht aus (siehe Logs oben) - wird NICHT als :latest veröffentlicht."
+            exit 1
+          fi
+          echo "Frontend-Smoke-Test erfolgreich."
+
+      # Kopiert den bereits gepushten (und getesteten) Multi-Arch-Manifest
+      # auf den Tag ":latest" - kein erneuter Build nötig.
+      - name: Promote to :latest
+        run: |
+          docker buildx imagetools create \
+            --tag ghcr.io/${{ github.repository_owner }}/servicebuch-${{ matrix.service }}:latest \
+            ghcr.io/${{ github.repository_owner }}/servicebuch-${{ matrix.service }}:${{ github.sha }}
