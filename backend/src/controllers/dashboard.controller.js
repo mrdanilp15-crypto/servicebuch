@@ -18,15 +18,19 @@ async function getDashboard(req, res, next) {
     const currentYear = now.getFullYear();
 
     const costPerYear = {};
+    const costPerYearByVehicle = {};
     let totalVehicles = vehicles.length;
     const dueServices = [];
     const warnings = [];
     const mileageDevelopment = {};
 
     for (const vehicle of vehicles) {
+      costPerYearByVehicle[vehicle.id] = {};
+
       for (const entry of vehicle.serviceEntries) {
         const year = new Date(entry.date).getFullYear();
         costPerYear[year] = (costPerYear[year] || 0) + (entry.cost || 0);
+        costPerYearByVehicle[vehicle.id][year] = (costPerYearByVehicle[vehicle.id][year] || 0) + (entry.cost || 0);
       }
 
       mileageDevelopment[vehicle.id] = {
@@ -79,6 +83,17 @@ async function getDashboard(req, res, next) {
         .map(([year, cost]) => ({ year: Number(year), cost: Math.round(cost * 100) / 100 }))
         .sort((a, b) => a.year - b.year),
       currentYearCost: Math.round((costPerYear[currentYear] || 0) * 100) / 100,
+      costPerYearByVehicle: Object.fromEntries(
+        Object.entries(costPerYearByVehicle).map(([vehicleId, byYear]) => [
+          vehicleId,
+          {
+            costPerYear: Object.entries(byYear)
+              .map(([year, cost]) => ({ year: Number(year), cost: Math.round(cost * 100) / 100 }))
+              .sort((a, b) => a.year - b.year),
+            currentYearCost: Math.round((byYear[currentYear] || 0) * 100) / 100,
+          },
+        ])
+      ),
       mileageDevelopment: Object.values(mileageDevelopment),
     });
   } catch (err) {

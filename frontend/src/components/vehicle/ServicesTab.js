@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import AuthImage from '../AuthImage';
 import { apiFetch, API_URL, getToken } from '../../lib/api';
 
 const SERVICE_TYPES = ['Ölwechsel', 'Inspektion', 'TÜV / HU', 'Bremsen', 'Reifenwechsel', 'Reparatur', 'Sonstiges'];
@@ -37,6 +38,8 @@ export default function ServicesTab({ vehicle }) {
   const [services, setServices] = useState([]);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [existingAttachments, setExistingAttachments] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [files, setFiles] = useState([]);
   const [saving, setSaving] = useState(false);
@@ -48,21 +51,59 @@ export default function ServicesTab({ vehicle }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicle.id]);
 
+  const openCreate = () => {
+    setEditingId(null);
+    setForm(emptyForm);
+    setExistingAttachments([]);
+    setFiles([]);
+    setError('');
+    setShowForm(true);
+  };
+
+  const openEdit = (s) => {
+    setEditingId(s.id);
+    setForm({
+      date: s.date.slice(0, 10),
+      mileage: s.mileage,
+      type: s.type,
+      workshop: s.workshop || '',
+      cost: s.cost ?? '',
+      notes: s.notes || '',
+      important: s.important,
+      recurring: s.recurring,
+      recurringIntervalMonths: s.recurringIntervalMonths ?? '',
+      recurringIntervalKm: s.recurringIntervalKm ?? '',
+    });
+    setExistingAttachments(s.attachments || []);
+    setFiles([]);
+    setError('');
+    setShowForm(true);
+  };
+
+  const closeForm = () => {
+    setShowForm(false);
+    setEditingId(null);
+    setForm(emptyForm);
+    setFiles([]);
+    setExistingAttachments([]);
+  };
+
   const submit = async (e) => {
     e.preventDefault();
     setSaving(true);
     setError('');
     try {
-      const entry = await apiFetch(`/vehicles/${vehicle.id}/services`, {
-        method: 'POST',
-        body: {
-          ...form,
-          mileage: Number(form.mileage),
-          cost: form.cost ? Number(form.cost) : 0,
-          recurringIntervalMonths: form.recurringIntervalMonths ? Number(form.recurringIntervalMonths) : null,
-          recurringIntervalKm: form.recurringIntervalKm ? Number(form.recurringIntervalKm) : null,
-        },
-      });
+      const body = {
+        ...form,
+        mileage: Number(form.mileage),
+        cost: form.cost ? Number(form.cost) : 0,
+        recurringIntervalMonths: form.recurringIntervalMonths ? Number(form.recurringIntervalMonths) : null,
+        recurringIntervalKm: form.recurringIntervalKm ? Number(form.recurringIntervalKm) : null,
+      };
+
+      const entry = editingId
+        ? await apiFetch(`/vehicles/${vehicle.id}/services/${editingId}`, { method: 'PUT', body })
+        : await apiFetch(`/vehicles/${vehicle.id}/services`, { method: 'POST', body });
 
       for (const file of files) {
         const fd = new FormData();
@@ -75,9 +116,7 @@ export default function ServicesTab({ vehicle }) {
         });
       }
 
-      setForm(emptyForm);
-      setFiles([]);
-      setShowForm(false);
+      closeForm();
       load();
     } catch (err) {
       setError(err.message);
@@ -86,16 +125,23 @@ export default function ServicesTab({ vehicle }) {
     }
   };
 
+  const removeAttachment = async (attachmentId) => {
+    if (!confirm('Diesen Anhang wirklich löschen?')) return;
+    await apiFetch(`/attachments/${attachmentId}`, { method: 'DELETE' });
+    setExistingAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
+  };
+
   const remove = async (id) => {
     if (!confirm('Diesen Service-Eintrag wirklich löschen?')) return;
     await apiFetch(`/vehicles/${vehicle.id}/services/${id}`, { method: 'DELETE' });
+    if (editingId === id) closeForm();
     load();
   };
 
   return (
     <div className="space-y-4">
       <div className="flex gap-2">
-        <button onClick={() => setShowForm((s) => !s)} className="btn-primary flex-1">
+        <button onClick={() => (showForm ? closeForm() : openCreate())} className="btn-primary flex-1 lg:flex-none lg:px-8">
           {showForm ? 'Abbrechen' : '+ Service-Eintrag'}
         </button>
         <button
@@ -110,6 +156,7 @@ export default function ServicesTab({ vehicle }) {
 
       {showForm && (
         <form onSubmit={submit} className="card space-y-3 lg:max-w-2xl">
+          <h2 className="font-semibold">{editingId ? 'Eintrag bearbeiten' : 'Neuer Eintrag'}</h2>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label">Datum</label>
@@ -134,11 +181,18 @@ export default function ServicesTab({ vehicle }) {
           </div>
           <div>
             <label className="label">Art des Service</label>
-            <select className="input" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
+            <input
+              className="input"
+              list="service-type-options"
+              required
+              value={form.type}
+              onChange={(e) => setForm({ ...form, type: e.target.value })}
+            />
+            <datalist id="service-type-options">
               {SERVICE_TYPES.map((t) => (
-                <option key={t}>{t}</option>
+                <option key={t} value={t} />
               ))}
-            </select>
+            </datalist>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -169,8 +223,36 @@ export default function ServicesTab({ vehicle }) {
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
             />
           </div>
+
+          {existingAttachments.length > 0 && (
+            <div>
+              <label className="label">Vorhandene Anhänge</label>
+              <div className="grid grid-cols-3 gap-2">
+                {existingAttachments.map((a) => (
+                  <div key={a.id} className="relative aspect-square">
+                    {a.mimeType?.startsWith('image/') ? (
+                      <AuthImage attachmentId={a.id} className="w-full h-full object-cover rounded-lg" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center rounded-lg bg-gray-100 text-xs text-gray-500 text-center p-1">
+                        {a.originalName || 'Datei'}
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => removeAttachment(a.id)}
+                      className="absolute top-1 right-1 bg-black/60 text-white rounded-full w-5 h-5 text-xs leading-5"
+                      aria-label="Anhang löschen"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div>
-            <label className="label">Rechnung (PDF) / Reparaturfotos</label>
+            <label className="label">{editingId ? 'Weitere Anhänge hinzufügen' : 'Rechnung (PDF) / Reparaturfotos'}</label>
             <input
               className="input"
               type="file"
@@ -221,9 +303,16 @@ export default function ServicesTab({ vehicle }) {
           )}
 
           {error && <p className="text-sm text-red-600">{error}</p>}
-          <button type="submit" disabled={saving} className="btn-primary w-full">
-            {saving ? 'Speichern…' : 'Eintrag speichern'}
-          </button>
+          <div className="flex gap-2">
+            <button type="submit" disabled={saving} className="btn-primary flex-1">
+              {saving ? 'Speichern…' : editingId ? 'Änderungen speichern' : 'Eintrag speichern'}
+            </button>
+            {editingId && (
+              <button type="button" onClick={() => remove(editingId)} className="btn-secondary text-red-600">
+                Löschen
+              </button>
+            )}
+          </div>
         </form>
       )}
 
@@ -247,6 +336,9 @@ export default function ServicesTab({ vehicle }) {
               <p className="text-xs text-gray-400 mt-1">{s.attachments.length} Anhang/Anhänge</p>
             )}
             <div className="flex gap-3 mt-2 text-xs">
+              <button onClick={() => openEdit(s)} className="text-brand-600">
+                Bearbeiten
+              </button>
               <button
                 onClick={() =>
                   downloadPdf(`${API_URL}/vehicles/${vehicle.id}/services/${s.id}/pdf`, `service-${s.id.slice(0, 8)}.pdf`)

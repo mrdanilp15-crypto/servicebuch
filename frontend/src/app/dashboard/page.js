@@ -15,6 +15,7 @@ function fmtDate(d) {
 export default function DashboardPage() {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
+  const [costFilter, setCostFilter] = useState('all');
 
   const load = async () => {
     try {
@@ -32,7 +33,12 @@ export default function DashboardPage() {
   if (error) return <p className="p-4 text-red-600">{error}</p>;
   if (!data) return <p className="p-4 text-gray-500">Lade Dashboard…</p>;
 
-  const costPoints = data.costPerYear.map((c) => ({ x: c.year, y: c.cost, label: String(c.year) }));
+  const selectedCost =
+    costFilter === 'all'
+      ? { costPerYear: data.costPerYear, currentYearCost: data.currentYearCost }
+      : data.costPerYearByVehicle?.[costFilter] || { costPerYear: [], currentYearCost: 0 };
+
+  const costPoints = selectedCost.costPerYear.map((c) => ({ x: c.year, y: c.cost, label: String(c.year) }));
 
   return (
     <div>
@@ -46,8 +52,10 @@ export default function DashboardPage() {
             <p className="text-xs lg:text-sm text-gray-500 mt-1">Fahrzeuge</p>
           </div>
           <div className="card text-center lg:py-6">
-            <p className="text-2xl lg:text-4xl font-bold">{data.currentYearCost.toFixed(0)} €</p>
-            <p className="text-xs lg:text-sm text-gray-500 mt-1">Kosten dieses Jahr</p>
+            <p className="text-2xl lg:text-4xl font-bold">{selectedCost.currentYearCost.toFixed(0)} €</p>
+            <p className="text-xs lg:text-sm text-gray-500 mt-1">
+              Kosten dieses Jahr{costFilter !== 'all' ? ' (gefiltert)' : ''}
+            </p>
           </div>
           <div className="card text-center lg:py-6">
             <p className="text-2xl lg:text-4xl font-bold">{data.dueServices.length}</p>
@@ -104,7 +112,21 @@ export default function DashboardPage() {
           </div>
 
           <div className="card">
-            <h2 className="font-semibold mb-2">Kosten pro Jahr</h2>
+            <div className="flex items-center justify-between mb-2 gap-2">
+              <h2 className="font-semibold">Kosten pro Jahr</h2>
+              <select
+                className="text-sm border border-gray-200 rounded-lg px-2 py-1 max-w-[55%]"
+                value={costFilter}
+                onChange={(e) => setCostFilter(e.target.value)}
+              >
+                <option value="all">Alle Fahrzeuge</option>
+                {data.vehicles.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.make} {v.model} ({v.licensePlate})
+                  </option>
+                ))}
+              </select>
+            </div>
             <LineChart points={costPoints} formatY={(y) => `${y.toFixed(0)} €`} />
           </div>
         </div>
