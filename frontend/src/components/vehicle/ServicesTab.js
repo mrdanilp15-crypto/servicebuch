@@ -109,7 +109,7 @@ export default function ServicesTab({ vehicle }) {
       </div>
 
       {showForm && (
-        <form onSubmit={submit} className="card space-y-3">
+        <form onSubmit={submit} className="card space-y-3 lg:max-w-2xl">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label">Datum</label>
@@ -227,7 +227,7 @@ export default function ServicesTab({ vehicle }) {
         </form>
       )}
 
-      <div className="space-y-2">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         {services.map((s) => (
           <div key={s.id} className="card">
             <div className="flex justify-between items-start">

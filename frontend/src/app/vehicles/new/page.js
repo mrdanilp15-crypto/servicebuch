@@ -1,11 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '../../../components/Header';
+import TagInput from '../../../components/TagInput';
 import { apiFetch } from '../../../lib/api';
-
-const TAG_OPTIONS = ['Privat', 'Firma', 'Feuerwehr', 'Projekt'];
 
 export default function NewVehiclePage() {
   const router = useRouter();
@@ -18,15 +17,19 @@ export default function NewVehiclePage() {
     currentMileage: '',
     tags: [],
   });
+  const [existingTags, setExistingTags] = useState([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const toggleTag = (tag) => {
-    setForm((f) => ({
-      ...f,
-      tags: f.tags.includes(tag) ? f.tags.filter((t) => t !== tag) : [...f.tags, tag],
-    }));
-  };
+  useEffect(() => {
+    apiFetch('/vehicles')
+      .then((vehicles) => {
+        const tags = new Set();
+        vehicles.forEach((v) => v.tags.forEach((t) => tags.add(t)));
+        setExistingTags([...tags]);
+      })
+      .catch(() => {});
+  }, []);
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -52,7 +55,7 @@ export default function NewVehiclePage() {
   return (
     <div>
       <Header title="Neues Fahrzeug" back />
-      <form onSubmit={onSubmit} className="p-4 space-y-4">
+      <form onSubmit={onSubmit} className="p-4 lg:p-8 lg:max-w-2xl space-y-4">
         <div className="card space-y-3">
           <div>
             <label className="label">Kennzeichen *</label>
@@ -109,20 +112,14 @@ export default function NewVehiclePage() {
           </div>
           <div>
             <label className="label">Tags</label>
-            <div className="flex gap-2 flex-wrap">
-              {TAG_OPTIONS.map((tag) => (
-                <button
-                  type="button"
-                  key={tag}
-                  onClick={() => toggleTag(tag)}
-                  className={`rounded-full px-3 py-1 text-sm ${
-                    form.tags.includes(tag) ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600'
-                  }`}
-                >
-                  {tag}
-                </button>
-              ))}
-            </div>
+            <p className="text-xs text-gray-400 mb-2">
+              Frei wählbar, z. B. zur Einordnung nach Nutzung (Privat, Firma, Feuerwehr, Projekt …).
+            </p>
+            <TagInput
+              value={form.tags}
+              onChange={(tags) => setForm({ ...form, tags })}
+              suggestions={existingTags}
+            />
           </div>
         </div>
 

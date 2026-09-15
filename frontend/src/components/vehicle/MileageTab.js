@@ -74,43 +74,45 @@ export default function MileageTab({ vehicle }) {
         <LineChart points={points} formatY={(y) => `${y.toLocaleString('de-DE')} km`} />
       </div>
 
-      <div className="card space-y-3">
-        <h2 className="font-semibold">Manuelle Eingabe</h2>
-        <form onSubmit={addManual} className="flex gap-2">
+      <div className="lg:grid lg:grid-cols-2 lg:gap-4 space-y-4 lg:space-y-0">
+        <div className="card space-y-3">
+          <h2 className="font-semibold">Manuelle Eingabe</h2>
+          <form onSubmit={addManual} className="flex gap-2">
+            <input
+              className="input"
+              type="number"
+              placeholder="Kilometerstand"
+              required
+              value={mileage}
+              onChange={(e) => setMileage(e.target.value)}
+            />
+            <button type="submit" className="btn-primary shrink-0">
+              Speichern
+            </button>
+          </form>
+        </div>
+
+        <div className="card space-y-3">
+          <h2 className="font-semibold">Foto vom Tacho</h2>
           <input
             className="input"
             type="number"
-            placeholder="Kilometerstand"
-            required
-            value={mileage}
-            onChange={(e) => setMileage(e.target.value)}
+            placeholder="Abgelesener Kilometerstand"
+            value={photoMileage}
+            onChange={(e) => setPhotoMileage(e.target.value)}
           />
-          <button type="submit" className="btn-primary shrink-0">
-            Speichern
+          <button onClick={() => fileRef.current?.click()} disabled={uploading} className="btn-secondary w-full">
+            {uploading ? 'Lädt…' : '📷 Foto aufnehmen / hochladen'}
           </button>
-        </form>
-      </div>
-
-      <div className="card space-y-3">
-        <h2 className="font-semibold">Foto vom Tacho</h2>
-        <input
-          className="input"
-          type="number"
-          placeholder="Abgelesener Kilometerstand"
-          value={photoMileage}
-          onChange={(e) => setPhotoMileage(e.target.value)}
-        />
-        <button onClick={() => fileRef.current?.click()} disabled={uploading} className="btn-secondary w-full">
-          {uploading ? 'Lädt…' : '📷 Foto aufnehmen / hochladen'}
-        </button>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          hidden
-          onChange={(e) => e.target.files[0] && uploadPhoto(e.target.files[0])}
-        />
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            hidden
+            onChange={(e) => e.target.files[0] && uploadPhoto(e.target.files[0])}
+          />
+        </div>
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}

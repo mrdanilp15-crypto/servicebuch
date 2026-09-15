@@ -2,7 +2,20 @@ const { z } = require('zod');
 const prisma = require('../lib/prisma');
 
 const reminderSchema = z.object({
-  type: z.enum(['TUEV', 'OEL', 'SERVICE_INTERVAL', 'KM_INTERVAL', 'REIFEN', 'CUSTOM']),
+  type: z.enum([
+    'TUEV',
+    'OEL',
+    'SERVICE_INTERVAL',
+    'KM_INTERVAL',
+    'REIFEN',
+    'BREMSEN',
+    'ZAHNRIEMEN',
+    'KLIMAANLAGE',
+    'BATTERIE',
+    'LUFTFILTER',
+    'KUPPLUNG',
+    'CUSTOM',
+  ]),
   label: z.string().min(1),
   dueDate: z.coerce.date().optional().nullable(),
   dueMileage: z.coerce.number().int().optional().nullable(),

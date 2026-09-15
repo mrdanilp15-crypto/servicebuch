@@ -44,12 +44,12 @@ export default function VehicleDetailPage() {
     <div>
       <Header title={`${vehicle.make} ${vehicle.model}`} back />
 
-      <div className="flex gap-1 overflow-x-auto px-4 pt-3 pb-1 sticky top-[57px] bg-gray-100 z-20">
+      <div className="flex gap-1 lg:gap-2 overflow-x-auto px-4 lg:px-8 pt-3 pb-1 sticky top-[57px] lg:top-[89px] bg-gray-100 z-20">
         {TABS.map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`shrink-0 rounded-full px-3 py-1.5 text-sm ${
+            className={`shrink-0 rounded-full px-3 lg:px-4 py-1.5 lg:py-2 text-sm lg:text-base font-medium ${
               tab === t.key ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 border border-gray-200'
             }`}
           >
@@ -58,7 +58,7 @@ export default function VehicleDetailPage() {
         ))}
       </div>
 
-      <div className="p-4">
+      <div className="p-4 lg:p-8">
         {tab === 'overview' && <OverviewTab vehicle={vehicle} onChange={setVehicle} />}
         {tab === 'services' && <ServicesTab vehicle={vehicle} />}
         {tab === 'mileage' && <MileageTab vehicle={vehicle} />}
@@ -66,7 +66,7 @@ export default function VehicleDetailPage() {
         {tab === 'reminders' && <RemindersTab vehicle={vehicle} />}
 
         {tab === 'overview' && (
-          <button onClick={deleteVehicle} className="w-full mt-4 text-sm text-red-600 py-2">
+          <button onClick={deleteVehicle} className="w-full mt-4 text-sm text-red-600 py-2 lg:max-w-2xl lg:block">
             Fahrzeug löschen
           </button>
         )}

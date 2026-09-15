@@ -1,6 +1,7 @@
 import './globals.css';
 import { AuthProvider } from '../components/AuthProvider';
 import BottomNav from '../components/BottomNav';
+import Sidebar from '../components/Sidebar';
 
 export const metadata = {
   title: 'Digitales Servicebuch',
@@ -20,7 +21,12 @@ export default function RootLayout({ children }) {
     <html lang="de">
       <body>
         <AuthProvider>
-          <div className="mx-auto min-h-screen max-w-lg bg-gray-100 pb-20">{children}</div>
+          <div className="lg:flex">
+            <Sidebar />
+            <div className="min-h-screen flex-1 bg-gray-100 pb-20 lg:pb-0">
+              <div className="mx-auto max-w-lg lg:max-w-7xl">{children}</div>
+            </div>
+          </div>
           <BottomNav />
         </AuthProvider>
       </body>

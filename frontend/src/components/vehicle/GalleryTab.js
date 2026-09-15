@@ -49,7 +49,7 @@ export default function GalleryTab({ vehicle }) {
 
   return (
     <div className="space-y-4">
-      <button onClick={() => fileRef.current?.click()} disabled={uploading} className="btn-primary w-full">
+      <button onClick={() => fileRef.current?.click()} disabled={uploading} className="btn-primary w-full lg:w-auto lg:max-w-xs">
         {uploading ? 'Lädt…' : '+ Fotos hinzufügen'}
       </button>
       <input
@@ -62,7 +62,7 @@ export default function GalleryTab({ vehicle }) {
       />
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2">
         {images.map((img) => (
           <div key={img.id} className="relative aspect-square">
             <AuthImage attachmentId={img.url} className="w-full h-full object-cover rounded-lg" />

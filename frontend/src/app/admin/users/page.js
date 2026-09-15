@@ -42,7 +42,7 @@ export default function AdminUsersPage() {
   return (
     <div>
       <Header title="Benutzerverwaltung" />
-      <div className="p-4 space-y-2">
+      <div className="p-4 lg:p-8 lg:max-w-3xl space-y-2">
         {error && <p className="text-sm text-red-600">{error}</p>}
         {users.map((u) => (
           <div key={u.id} className="card flex items-center justify-between">
@@ -67,7 +67,7 @@ export default function AdminUsersPage() {
           </div>
         ))}
       </div>
-      <p className="px-4 text-xs text-gray-400">
+      <p className="px-4 lg:px-8 lg:max-w-3xl text-xs text-gray-400">
         Fahrzeuge werden auf der jeweiligen Fahrzeugseite (Tab „Übersicht") einzelnen Benutzern zugewiesen.
       </p>
     </div>

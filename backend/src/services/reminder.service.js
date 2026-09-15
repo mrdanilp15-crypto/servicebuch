@@ -12,9 +12,15 @@ const SERVICE_KM_WARNING = Number(process.env.SERVICE_INTERVAL_KM_WARNING || 100
 const TYPE_LABELS = {
   TUEV: 'TÜV fällig',
   OEL: 'Ölwechsel fällig',
-  SERVICE_INTERVAL: 'Service-Intervall erreicht',
+  SERVICE_INTERVAL: 'Inspektion / Service fällig',
   KM_INTERVAL: 'Kilometerstand über Intervall',
   REIFEN: 'Reifenwechsel fällig',
+  BREMSEN: 'Bremsen fällig',
+  ZAHNRIEMEN: 'Zahnriemenwechsel fällig',
+  KLIMAANLAGE: 'Klimaanlage-Service fällig',
+  BATTERIE: 'Batterie-Check fällig',
+  LUFTFILTER: 'Luftfilterwechsel fällig',
+  KUPPLUNG: 'Kupplung fällig',
   CUSTOM: 'Erinnerung',
 };
 
