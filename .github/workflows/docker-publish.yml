@@ -1,9 +1,10 @@
 name: Build and publish Docker images
 
-# Baut backend/ und frontend/ als Docker-Images, startet sie testweise und
-# veröffentlicht sie erst dann als ":latest" in der GitHub Container
-# Registry (ghcr.io) - genau die Images, die docker-compose.yml per
-# "image:" referenziert. Ein Image, das den Smoke-Test nicht besteht,
+# Baut backend/ und frontend/ als Docker-Images, testet sie einzeln UND im
+# Verbund (Frontend-Proxy -> Backend, über ein echtes Docker-Netzwerk -
+# genau der Aufbau, den docker-compose.yml auch produziert) und
+# veröffentlicht sie erst DANACH als ":latest" in der GitHub Container
+# Registry (ghcr.io). Ein Image, das irgendeinen der Tests nicht besteht,
 # landet NIE auf ":latest" (nur unter dem Commit-SHA-Tag, zur Diagnose).
 # Läuft automatisch bei jedem Push auf main (nur wenn sich backend/,
 # frontend/ oder dieser Workflow geändert haben) und lässt sich
@@ -44,8 +45,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Nur mit dem Commit-SHA getaggt - ":latest" wird erst unten gesetzt,
-      # wenn der Smoke-Test erfolgreich war.
+      # Nur mit dem Commit-SHA getaggt - ":latest" wird erst ganz am Ende
+      # (Job "promote") gesetzt, wenn wirklich alle Tests grün sind.
       - name: Build and push (SHA tag only)
         uses: docker/build-push-action@v5
         with:
@@ -59,6 +60,9 @@ jobs:
       # Testet BEIDE Plattformen (amd64 UND arm64, über QEMU-Emulation) -
       # ein Bug, der nur unter einer Architektur auftritt (z.B. Prisma auf
       # Alpine/musl/arm64), wird damit vor der Veröffentlichung erkannt.
+      # Ruft zusätzlich POST /api/auth/register auf: /api/health allein
+      # prüft nur "Prozess läuft", register() übt dagegen Argon2 (natives
+      # Modul!) und einen echten Prisma-Datenbank-Write aus.
       - name: Smoke test backend image (amd64 + arm64)
         if: matrix.service == 'backend'
         run: |
@@ -80,12 +84,9 @@ jobs:
               echo "--- $platform container logs ---"
               docker logs "$name" || true
               docker rm -f "$name" || true
-              echo "::error::Backend-Image ($platform) ist nicht gesund geworden (siehe Logs oben) - wird NICHT als :latest veröffentlicht."
+              echo "::error::Backend-Image ($platform) ist nicht gesund geworden (siehe Logs oben)."
               exit 1
             fi
-            # /api/health prüft nur, dass der Prozess läuft - registriert
-            # aber testet den kompletten Pfad inkl. Argon2 (natives Modul!)
-            # und einem echten Prisma-Datenbank-Write, nicht nur "lädt".
             reg_code=$(curl -s -o /tmp/register_response.json -w "%{http_code}" \
               -X POST http://localhost:4000/api/auth/register \
               -H "Content-Type: application/json" \
@@ -96,7 +97,7 @@ jobs:
             if [ "$reg_code" != "201" ]; then
               echo "--- register response ---"
               cat /tmp/register_response.json || true
-              echo "::error::Backend-Image ($platform): POST /api/auth/register lieferte HTTP $reg_code statt 201 (siehe Logs/Response oben) - wird NICHT als :latest veröffentlicht."
+              echo "::error::Backend-Image ($platform): POST /api/auth/register lieferte HTTP $reg_code statt 201 (siehe Logs/Response oben)."
               exit 1
             fi
             echo "$platform OK (health + register/Argon2/Prisma-Write)"
@@ -122,16 +123,98 @@ jobs:
             docker logs "$name" || true
             docker rm -f "$name" || true
             if [ -z "$ok" ]; then
-              echo "::error::Frontend-Image ($platform) liefert /login nicht aus (siehe Logs oben) - wird NICHT als :latest veröffentlicht."
+              echo "::error::Frontend-Image ($platform) liefert /login nicht aus (siehe Logs oben)."
               exit 1
             fi
             echo "$platform OK"
           done
           echo "Frontend-Smoke-Test erfolgreich (amd64 + arm64)."
 
-      # Kopiert den bereits gepushten (und getesteten) Multi-Arch-Manifest
-      # auf den Tag ":latest" - kein erneuter Build nötig.
-      - name: Promote to :latest
+  # Startet Backend + Frontend zusammen in einem echten Docker-Netzwerk -
+  # exakt der Aufbau aus docker-compose.yml - und registriert einen
+  # Nutzer über den Frontend-Proxy (Port 3000), nicht direkt am Backend.
+  # Das ist der Test, der den echten Produktionsbug gefangen hätte: die
+  # rewrites()-Route in next.config.js wurde beim BUILD ausgewertet (fixer
+  # Wert im Image), nicht zur Laufzeit - im Einzel-Container-Smoke-Test
+  # unsichtbar, weil dort kein zweiter Container involviert war.
+  integration-test:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Full-stack test (Frontend-Proxy -> Backend über Docker-Netzwerk)
+        run: |
+          set -e
+          docker network create sb-test-net
+
+          docker run -d --name sb-test-backend --network sb-test-net \
+            -e DATABASE_URL=file:/app/data/dev.db \
+            -e DATA_DIR=/app/data \
+            ghcr.io/${{ github.repository_owner }}/servicebuch-backend:${{ github.sha }}
+
+          docker run -d --name sb-test-frontend --network sb-test-net \
+            -e BACKEND_INTERNAL_URL=http://sb-test-backend:4000 \
+            -p 3000:3000 \
+            ghcr.io/${{ github.repository_owner }}/servicebuch-frontend:${{ github.sha }}
+
+          ok=""
+          for i in $(seq 1 30); do
+            if docker exec sb-test-backend wget -q --spider http://localhost:4000/api/health; then ok=1; break; fi
+            sleep 2
+          done
+          if [ -z "$ok" ]; then
+            echo "::error::Backend im Testnetzwerk nicht gesund geworden."
+            docker logs sb-test-backend || true
+            exit 1
+          fi
+
+          reg_code=$(curl -s -o /tmp/reg.json -w "%{http_code}" \
+            -X POST http://localhost:3000/api/auth/register \
+            -H "Content-Type: application/json" \
+            -d '{"email":"integration@example.com","password":"IntegrationTest123!","name":"Integration Test"}')
+
+          echo "--- frontend logs ---"
+          docker logs sb-test-frontend || true
+          echo "--- backend logs ---"
+          docker logs sb-test-backend || true
+          docker rm -f sb-test-frontend sb-test-backend || true
+          docker network rm sb-test-net || true
+
+          if [ "$reg_code" != "201" ]; then
+            echo "--- register response ---"
+            cat /tmp/reg.json || true
+            echo "::error::Integrationstest fehlgeschlagen: Registrierung über den Frontend-Proxy (Port 3000 -> BACKEND_INTERNAL_URL) lieferte HTTP $reg_code statt 201."
+            exit 1
+          fi
+          echo "Integrationstest erfolgreich: Frontend-Proxy erreicht das Backend exakt wie in docker-compose.yml."
+
+  # Kopiert die bereits gepushten (und getesteten) Multi-Arch-Manifeste auf
+  # den Tag ":latest" - kein erneuter Build nötig. Läuft nur, wenn ALLE
+  # Einzel- UND der Integrationstest erfolgreich waren.
+  promote:
+    needs: [build-and-push, integration-test]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [backend, frontend]
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Promote ${{ matrix.service }} to :latest
         run: |
           docker buildx imagetools create \
             --tag ghcr.io/${{ github.repository_owner }}/servicebuch-${{ matrix.service }}:latest \

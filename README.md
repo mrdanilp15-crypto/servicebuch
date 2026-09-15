@@ -258,8 +258,9 @@ Portainers eigenes Ingress-Setup) mit TLS-Zertifikat vor beide Services schalten
 benötigt HTTPS. `FRONTEND_URL` in `docker-compose.yml` auf die echte Domain anpassen (nur für
 CORS relevant). Die Backend-Adresse selbst muss **nicht** angepasst werden: das Frontend ruft
 immer `/api/...` relativ zur eigenen Domain auf, der Next.js-Server proxied das serverseitig
-zum `backend`-Container (siehe `BACKEND_INTERNAL_URL`, `frontend/next.config.js`) – das
-funktioniert unabhängig davon, unter welcher Domain/IP die App erreichbar ist, ohne Rebuild.
+zum `backend`-Container (siehe `BACKEND_INTERNAL_URL`,
+`frontend/src/app/api/[...path]/route.js`) – das funktioniert unabhängig davon, unter welcher
+Domain/IP die App erreichbar ist, ohne Rebuild.
 
 ### Ohne Docker (z. B. VPS, Render, Railway, Fly.io)
 
@@ -274,7 +275,7 @@ funktioniert unabhängig davon, unter welcher Domain/IP die App erreichbar ist, 
    - `npx prisma migrate deploy` erneut ausführen
 2. **Frontend**: `npm ci`, `npm run build`, `npm start` (oder `next start`). Umgebungsvariable
    `BACKEND_INTERNAL_URL` auf die (server-intern erreichbare) Backend-URL setzen – wird zur
-   Laufzeit gelesen, kein Rebuild nötig, siehe `frontend/next.config.js`.
+   Laufzeit gelesen, kein Rebuild nötig, siehe `frontend/src/app/api/[...path]/route.js`.
 3. **Uploads**: `UPLOAD_DIR` auf ein persistentes Volume zeigen lassen (nicht auf ephemeren
    Storage bei PaaS-Anbietern ohne Volume-Unterstützung).
 4. **Reverse Proxy / HTTPS**: für Produktion zwingend erforderlich (Web Push, sichere Cookies
