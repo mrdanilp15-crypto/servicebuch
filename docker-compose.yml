@@ -1,0 +1,45 @@
+version: '3.8'
+
+# Einfaches Deployment mit SQLite (Standard) - keine externe Datenbank nötig.
+# Für Postgres: DATABASE_URL anpassen, provider in backend/prisma/schema.prisma
+# auf "postgresql" ändern und einen db-Service ergänzen (siehe README).
+
+services:
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    ports:
+      - '4000:4000'
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      DATABASE_URL: file:/app/data/dev.db
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET muss gesetzt sein}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      UPLOAD_DIR: /app/uploads
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-15}
+      UPLOAD_ENCRYPTION_KEY: ${UPLOAD_ENCRYPTION_KEY:?UPLOAD_ENCRYPTION_KEY muss gesetzt sein (64 Hex-Zeichen)}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@example.com}
+      TUEV_WARNING_DAYS: ${TUEV_WARNING_DAYS:-30}
+      SERVICE_INTERVAL_KM_WARNING: ${SERVICE_INTERVAL_KM_WARNING:-1000}
+    volumes:
+      - servicebuch_data:/app/data
+      - servicebuch_uploads:/app/uploads
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000/api}
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    depends_on:
+      - backend
+
+volumes:
+  servicebuch_data:
+  servicebuch_uploads:

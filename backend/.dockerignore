@@ -1,0 +1,6 @@
+node_modules
+uploads
+data
+.env
+prisma/dev.db
+prisma/dev.db-journal

@@ -1,0 +1,175 @@
+// Digitales Servicebuch - Datenmodell
+// Standard-Datenbank: SQLite (keine Installation nötig).
+// Für Produktion: provider auf "postgresql" oder "mysql" umstellen und
+// DATABASE_URL entsprechend setzen (siehe README "Deployment").
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Hinweis: SQLite unterstützt in Prisma keine nativen Enums, daher werden
+// die folgenden Felder als String gespeichert und auf Anwendungsebene per
+// Zod validiert (siehe jeweilige controller/*.js):
+//   User.role            -> "ADMIN" | "USER"
+//   VehicleAssignment.role -> "OWNER" | "EDITOR" | "VIEWER"
+//   Attachment.type       -> "INVOICE" | "PHOTO" | "ODOMETER"
+//   MileageEntry.source   -> "MANUAL" | "PHOTO" | "SERVICE_ENTRY"
+//   ReminderRule.type / Notification.type
+//     -> "TUEV" | "OEL" | "SERVICE_INTERVAL" | "KM_INTERVAL" | "REIFEN" | "CUSTOM"
+// Bei Wechsel auf Postgres/MySQL können diese optional wieder in echte
+// `enum`-Typen umgewandelt werden.
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  password     String
+  name         String
+  role         String   @default("USER")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  assignments       VehicleAssignment[]
+  pushSubscriptions PushSubscription[]
+  notifications     Notification[]
+}
+
+model Vehicle {
+  id            String   @id @default(uuid())
+  licensePlate  String
+  make          String
+  model         String
+  year          Int?
+  vin           String?
+  tags          String   @default("") // comma-separated: Privat,Firma,Feuerwehr,Projekt
+  headerImage   String? // path to profile/header image
+  currentMileage Int     @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  assignments    VehicleAssignment[]
+  images         VehicleImage[]
+  serviceEntries ServiceEntry[]
+  mileageEntries MileageEntry[]
+  reminderRules  ReminderRule[]
+  notifications  Notification[]
+  attachments    Attachment[]
+}
+
+model VehicleAssignment {
+  id        String         @id @default(uuid())
+  userId    String
+  vehicleId String
+  role      String   @default("OWNER")
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, vehicleId])
+}
+
+model VehicleImage {
+  id        String   @id @default(uuid())
+  vehicleId String
+  url       String
+  caption   String?
+  createdAt DateTime @default(now())
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+}
+
+model ServiceEntry {
+  id                     String   @id @default(uuid())
+  vehicleId              String
+  date                   DateTime
+  mileage                Int
+  type                   String // e.g. "Ölwechsel", "Inspektion", "TÜV", ...
+  workshop                String?
+  cost                   Float?   @default(0)
+  notes                  String?
+  important              Boolean  @default(false)
+  recurring              Boolean  @default(false)
+  recurringIntervalMonths Int?
+  recurringIntervalKm    Int?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  vehicle     Vehicle      @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  attachments Attachment[]
+}
+
+model Attachment {
+  id             String   @id @default(uuid())
+  vehicleId      String
+  serviceEntryId String?
+  type           String // "INVOICE" | "PHOTO" | "ODOMETER"
+  fileName       String
+  originalName   String
+  mimeType       String
+  size           Int
+  iv             String // AES-GCM initialization vector (hex)
+  authTag        String // AES-GCM auth tag (hex)
+  createdAt      DateTime @default(now())
+
+  vehicle      Vehicle       @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  serviceEntry ServiceEntry? @relation(fields: [serviceEntryId], references: [id], onDelete: Cascade)
+}
+
+model MileageEntry {
+  id        String   @id @default(uuid())
+  vehicleId String
+  date      DateTime @default(now())
+  mileage   Int
+  source    String   @default("MANUAL") // "MANUAL" | "PHOTO" | "SERVICE_ENTRY"
+  photoPath String?
+  createdAt DateTime @default(now())
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+}
+
+model ReminderRule {
+  id               String    @id @default(uuid())
+  vehicleId        String
+  type             String // "TUEV" | "OEL" | "SERVICE_INTERVAL" | "KM_INTERVAL" | "REIFEN" | "CUSTOM"
+  label            String
+  dueDate          DateTime?
+  dueMileage       Int?
+  intervalMonths   Int?
+  intervalKm       Int?
+  active           Boolean   @default(true)
+  lastTriggeredAt  DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  vehicleId String?
+  title     String
+  body      String
+  type      String   @default("CUSTOM")
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicle Vehicle? @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+}
+
+model PushSubscription {
+  id        String   @id @default(uuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
