@@ -148,11 +148,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Kein "set -e" hier: in Kombination mit der for/if-Schleife unten
-      # hat das nachweislich zu einem sofortigen, nicht nachvollziehbaren
-      # Fehlschlag geführt (Exit 56 direkt nach dem zweiten "docker run",
-      # noch bevor die Schleife überhaupt einen Sleep-Zyklus erreicht hat).
-      # Stattdessen wird jeder relevante Exit-Code explizit geprüft.
+      # GitHub Actions führt "run:"-Bash-Schritte unabhängig von einem
+      # eigenen "set -e" bereits mit "-e" aus. Ein Befehl, dessen
+      # Fehlschlagen Teil der normalen Kontrollflusslogik ist (hier: der
+      # Health-Check-Retry), MUSS deshalb direkt als Bedingung eines "if"
+      # stehen ("if CMD; then ...") - als eigenständige Zeile gefolgt von
+      # einem separaten "if [ \"$?\" = 0 ]" bricht "-e" das ganze Skript
+      # beim ERSTEN Fehlschlag ab, noch bevor die if-Prüfung überhaupt
+      # erreicht wird (genau das ist hier zwischenzeitlich passiert).
       - name: Full-stack test (Frontend-Proxy -> Backend über Docker-Netzwerk)
         run: |
           docker network create sb-test-net
@@ -167,10 +170,14 @@ jobs:
             -p 3000:3000 \
             ghcr.io/${{ github.repository_owner }}/servicebuch-frontend:${{ github.sha }}
 
+          # Kurze Anlaufzeit, bevor der erste Health-Check versucht wird
+          # (Docker-Netzwerk/DNS zwischen den beiden frisch gestarteten
+          # Containern braucht einen Moment).
+          sleep 3
+
           ok=""
           for i in $(seq 1 30); do
-            docker exec sb-test-backend wget -q --spider http://localhost:4000/api/health
-            if [ "$?" = "0" ]; then ok=1; break; fi
+            if docker exec sb-test-backend wget -q --spider http://localhost:4000/api/health; then ok=1; break; fi
             sleep 2
           done
           if [ -z "$ok" ]; then
