@@ -173,6 +173,7 @@ export default function ServicesTab({ vehicle }) {
               <input
                 className="input"
                 type="number"
+                autoComplete="off"
                 required
                 value={form.mileage}
                 onChange={(e) => setForm({ ...form, mileage: e.target.value })}
@@ -286,6 +287,7 @@ export default function ServicesTab({ vehicle }) {
                 <input
                   className="input"
                   type="number"
+                  autoComplete="off"
                   value={form.recurringIntervalMonths}
                   onChange={(e) => setForm({ ...form, recurringIntervalMonths: e.target.value })}
                 />
@@ -295,6 +297,7 @@ export default function ServicesTab({ vehicle }) {
                 <input
                   className="input"
                   type="number"
+                  autoComplete="off"
                   value={form.recurringIntervalKm}
                   onChange={(e) => setForm({ ...form, recurringIntervalKm: e.target.value })}
                 />

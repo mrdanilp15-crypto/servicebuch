@@ -161,6 +161,7 @@ export default function RemindersTab({ vehicle }) {
                   <input
                     className="input"
                     type="number"
+                    autoComplete="off"
                     placeholder="z. B. 12"
                     value={form.intervalMonths}
                     onChange={(e) => setForm({ ...form, intervalMonths: e.target.value })}
@@ -171,6 +172,7 @@ export default function RemindersTab({ vehicle }) {
                   <input
                     className="input"
                     type="number"
+                    autoComplete="off"
                     placeholder="z. B. 15000"
                     value={form.intervalKm}
                     onChange={(e) => setForm({ ...form, intervalKm: e.target.value })}
@@ -197,6 +199,7 @@ export default function RemindersTab({ vehicle }) {
                   <input
                     className="input"
                     type="number"
+                    autoComplete="off"
                     value={form.dueMileage}
                     onChange={(e) => setForm({ ...form, dueMileage: e.target.value })}
                   />
