@@ -1,0 +1,80 @@
+version: '3.8'
+
+# Variante von docker-compose.yml für Setups mit Reverse Proxy über ein
+# macvlan-Netzwerk (z.B. Nginx Proxy Manager, wenn jeder Container eine
+# eigene feste LAN-IP bekommt statt nur über Host-Ports erreichbar zu
+# sein). Für alle anderen: die normale docker-compose.yml verwenden - die
+# braucht kein vorab existierendes externes Netzwerk und läuft überall.
+#
+# Setup:
+# 1. Unten bei "npm_macvlan_new" den Netzwerknamen auf dein eigenes
+#    externes macvlan-Netzwerk anpassen (Portainer -> Networks zeigt den
+#    genauen Namen).
+# 2. Bei "ipv4_address" eine freie IP aus deinem LAN eintragen (nicht im
+#    DHCP-Bereich deines Routers, sonst kann es zu Adresskonflikten
+#    kommen).
+# 3. In Nginx Proxy Manager einen neuen Proxy Host anlegen: Forward
+#    Hostname/IP = genau diese IP, Forward Port = 3000, SSL-Zertifikat
+#    (Let's Encrypt) für deine gewünschte Domain aktivieren.
+# 4. Diese Datei komplett in Portainer (Stacks -> Add stack -> Web editor)
+#    einfügen und deployen.
+#
+# Warum überhaupt nötig? Service Worker (fürs Installieren als App aufs
+# Handy, Samsung Internet inklusive, und für Web-Push) funktionieren im
+# Browser nur über HTTPS oder localhost - eine reine
+# http://<lan-ip>:3000-Adresse reicht dafür nicht aus.
+#
+# Das Backend hängt bewusst NICHT im macvlan-Netzwerk - es wird nur intern
+# vom Frontend über den Docker-Servicenamen "backend" erreicht (siehe
+# next.config.js-Proxy) und muss daher nicht extra im LAN sichtbar sein.
+
+services:
+  backend:
+    image: ghcr.io/mrdanilp15-crypto/servicebuch-backend:latest
+    pull_policy: always
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      # An die tatsächliche Domain anpassen, die NPM vor das Frontend
+      # schaltet (siehe unten) - nur für CORS relevant, nicht sicherheitskritisch.
+      FRONTEND_URL: https://servicebuch.example.com
+      DATABASE_URL: file:/app/data/dev.db
+      DATA_DIR: /app/data
+      UPLOAD_DIR: /app/uploads
+      MAX_UPLOAD_MB: 15
+      VAPID_SUBJECT: mailto:admin@example.com
+      TUEV_WARNING_DAYS: 30
+      SERVICE_INTERVAL_KM_WARNING: 1000
+    volumes:
+      - servicebuch_data:/app/data
+      - servicebuch_uploads:/app/uploads
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://localhost:4000/api/health']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  frontend:
+    image: ghcr.io/mrdanilp15-crypto/servicebuch-frontend:latest
+    pull_policy: always
+    restart: unless-stopped
+    environment:
+      BACKEND_INTERNAL_URL: http://backend:4000
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      default: {}
+      npm_macvlan_new:
+        ipv4_address: 192.168.178.215 # <- eine freie IP in deinem Netz eintragen!
+
+networks:
+  default: {}
+  npm_macvlan_new:
+    external: true
+
+volumes:
+  servicebuch_data:
+  servicebuch_uploads:

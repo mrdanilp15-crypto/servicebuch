@@ -96,6 +96,7 @@ Servicebuch/
 │       └── lib/                 API-Client (ruft immer /api relativ auf)
 ├── docker-compose.yml         Pullt fertige Images von ghcr.io (für Portainer & Produktion)
 ├── docker-compose.override.yml  Baut lokal aus dem Quellcode (greift nur bei geklontem Repo)
+├── docker-compose.macvlan.yml   Variante mit eigener LAN-IP fürs Frontend (Reverse Proxy/NPM)
 ├── start.bat / start.sh       Doppelklick-Starter für Docker Desktop (lokal)
 ├── stop.bat / stop.sh         Stoppt die App wieder
 └── README.md
@@ -226,6 +227,32 @@ App).
 > Hinweis: Web Push funktioniert in den meisten mobilen Browsern nur zuverlässig, wenn die
 > Seite über HTTPS ausgeliefert wird (in der Produktion) bzw. wenn die App auf dem Homescreen
 > installiert ist (iOS Safari erfordert PWA-Installation für Push).
+
+## Als App aufs Handy installieren (PWA)
+
+Die App ist eine installierbare Progressive Web App: eigenes Icon auf dem Homescreen, startet
+im eigenen App-Fenster statt in einem Browser-Tab, funktioniert mit Push-Benachrichtigungen.
+Manifest (`frontend/public/manifest.json`), Icons (`frontend/public/icons/`) und Service Worker
+(`frontend/public/sw.js`, inkl. Offline-Fallback-Seite) sind bereits vollständig eingerichtet.
+
+**Wichtig:** Service Worker – und damit Installierbarkeit und Push – funktionieren in jedem
+Browser (Samsung Internet, Chrome, …) nur über **HTTPS oder `localhost`**. Eine reine
+`http://<lan-ip>:3000`-Adresse reicht nicht aus; die App lässt sich dann zwar per "Zu Startbildschirm
+hinzufügen" als Verknüpfung ablegen, aber ohne Service Worker/Push und ohne echtes App-Fenster.
+
+Um HTTPS zu bekommen, reicht irgendein Reverse Proxy mit TLS-Zertifikat vor dem Frontend
+(Port 3000), z. B.:
+
+- **Nginx Proxy Manager über ein macvlan-Netzwerk** (eigene LAN-IP pro Container): siehe
+  [`docker-compose.macvlan.yml`](docker-compose.macvlan.yml) – fertige Variante der normalen
+  Compose-Datei, Netzwerkname/IP anpassen und in Portainer einfügen.
+- Alternativ: Caddy/Traefik mit automatischem Let's-Encrypt-Zertifikat, oder ein Tunnel-Dienst
+  ohne Portfreigabe (z. B. Cloudflare Tunnel, Tailscale Funnel) – in allen Fällen zeigt der
+  Proxy auf `<frontend-container>:3000`.
+
+Danach in Samsung Internet: Seite über die HTTPS-Domain öffnen → Menü (☰) → **Seite zu
+Start hinzufügen** (bzw. der Browser zeigt von selbst einen Installations-Hinweis an). Die App
+öffnet sich danach im eigenen Fenster ohne Adressleiste.
 
 ## Sicherheit
 

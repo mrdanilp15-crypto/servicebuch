@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Offline – Digitales Servicebuch</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 12px;
+      font-family: -apple-system, system-ui, sans-serif;
+      background: #f3f4f6;
+      color: #111827;
+      text-align: center;
+      padding: 24px;
+    }
+    .icon { font-size: 48px; }
+    h1 { font-size: 18px; margin: 0; }
+    p { color: #6b7280; margin: 0; max-width: 320px; }
+    button {
+      margin-top: 8px;
+      background: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 12px;
+      padding: 10px 20px;
+      font-size: 15px;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <div class="icon">🚗</div>
+  <h1>Keine Verbindung</h1>
+  <p>Das Servicebuch ist gerade nicht erreichbar. Prüfe deine Internet-/WLAN-Verbindung und versuche es erneut.</p>
+  <button onclick="location.reload()">Erneut versuchen</button>
+</body>
+</html>
