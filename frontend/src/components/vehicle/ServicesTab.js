@@ -5,6 +5,7 @@ import AuthImage from '../AuthImage';
 import { apiFetch, API_URL, getToken } from '../../lib/api';
 
 const SERVICE_TYPES = ['Ölwechsel', 'Inspektion', 'TÜV / HU', 'Bremsen', 'Reifenwechsel', 'Reparatur', 'Sonstiges'];
+const CUSTOM_TYPE_OPTION = '__custom__';
 
 const emptyForm = {
   date: new Date().toISOString().slice(0, 10),
@@ -41,6 +42,7 @@ export default function ServicesTab({ vehicle }) {
   const [editingId, setEditingId] = useState(null);
   const [existingAttachments, setExistingAttachments] = useState([]);
   const [form, setForm] = useState(emptyForm);
+  const [useCustomType, setUseCustomType] = useState(false);
   const [files, setFiles] = useState([]);
   const [saving, setSaving] = useState(false);
 
@@ -54,6 +56,7 @@ export default function ServicesTab({ vehicle }) {
   const openCreate = () => {
     setEditingId(null);
     setForm(emptyForm);
+    setUseCustomType(false);
     setExistingAttachments([]);
     setFiles([]);
     setError('');
@@ -74,6 +77,7 @@ export default function ServicesTab({ vehicle }) {
       recurringIntervalMonths: s.recurringIntervalMonths ?? '',
       recurringIntervalKm: s.recurringIntervalKm ?? '',
     });
+    setUseCustomType(!SERVICE_TYPES.includes(s.type));
     setExistingAttachments(s.attachments || []);
     setFiles([]);
     setError('');
@@ -84,6 +88,7 @@ export default function ServicesTab({ vehicle }) {
     setShowForm(false);
     setEditingId(null);
     setForm(emptyForm);
+    setUseCustomType(false);
     setFiles([]);
     setExistingAttachments([]);
   };
@@ -182,18 +187,36 @@ export default function ServicesTab({ vehicle }) {
           </div>
           <div>
             <label className="label">Art des Service</label>
-            <input
+            <select
               className="input"
-              list="service-type-options"
-              required
-              value={form.type}
-              onChange={(e) => setForm({ ...form, type: e.target.value })}
-            />
-            <datalist id="service-type-options">
+              value={useCustomType ? CUSTOM_TYPE_OPTION : form.type}
+              onChange={(e) => {
+                if (e.target.value === CUSTOM_TYPE_OPTION) {
+                  setUseCustomType(true);
+                  setForm({ ...form, type: '' });
+                } else {
+                  setUseCustomType(false);
+                  setForm({ ...form, type: e.target.value });
+                }
+              }}
+            >
               {SERVICE_TYPES.map((t) => (
-                <option key={t} value={t} />
+                <option key={t} value={t}>
+                  {t}
+                </option>
               ))}
-            </datalist>
+              <option value={CUSTOM_TYPE_OPTION}>Andere (eigene Eingabe)…</option>
+            </select>
+            {useCustomType && (
+              <input
+                className="input mt-2"
+                required
+                autoFocus
+                placeholder="Art des Service eingeben"
+                value={form.type}
+                onChange={(e) => setForm({ ...form, type: e.target.value })}
+              />
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>

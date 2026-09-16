@@ -44,6 +44,10 @@ async function getVehicle(req, res, next) {
       include: {
         images: { orderBy: { createdAt: 'desc' } },
         reminderRules: { where: { active: true } },
+        assignments: {
+          include: { user: { select: { id: true, name: true, email: true } } },
+          orderBy: { createdAt: 'asc' },
+        },
         _count: { select: { serviceEntries: true, mileageEntries: true } },
       },
     });

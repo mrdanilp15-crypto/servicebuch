@@ -80,7 +80,7 @@ export default function OverviewTab({ vehicle, onChange }) {
         {error && <p className="text-sm text-red-600">{error}</p>}
 
         <div className="hidden lg:block">
-          <AssignmentBox vehicleId={vehicle.id} />
+          <AssignmentBox vehicleId={vehicle.id} assignments={vehicle.assignments} onChange={onChange} />
         </div>
       </div>
 
@@ -127,7 +127,7 @@ export default function OverviewTab({ vehicle, onChange }) {
       </div>
 
       <div className="lg:hidden">
-        <AssignmentBox vehicleId={vehicle.id} />
+        <AssignmentBox vehicleId={vehicle.id} assignments={vehicle.assignments} onChange={onChange} />
       </div>
     </div>
   );
