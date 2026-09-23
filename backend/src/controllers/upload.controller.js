@@ -140,6 +140,11 @@ async function serveAttachment(req, res, next) {
     const encrypted = await readEncryptedFile(attachment.fileName);
     const decrypted = decryptBuffer(encrypted, attachment.iv, attachment.authTag);
 
+    // Der Inhalt hinter einer Attachment-ID ändert sich nie (ein Ersetzen
+    // legt immer eine neue Attachment-ID an) - darf also aggressiv und
+    // langfristig gecacht werden. "private", weil die Route
+    // authentifiziert ist und der Inhalt nutzerspezifisch sein kann.
+    res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
     res.setHeader('Content-Type', attachment.mimeType);
     res.setHeader('Content-Disposition', `inline; filename="${path.basename(attachment.originalName)}"`);
     res.send(decrypted);

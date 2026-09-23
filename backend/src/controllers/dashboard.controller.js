@@ -5,12 +5,26 @@ async function getDashboard(req, res, next) {
     const vehicleWhere =
       req.user.role === 'ADMIN' ? {} : { assignments: { some: { userId: req.user.id } } };
 
+    // select statt include: das Dashboard braucht pro Service-/Kilometerstand-
+    // Eintrag nur ein paar Felder, nicht das komplette Objekt (Notizen,
+    // Werkstatt, Wiederkehr-Einstellungen, ...) - bei vielen Einträgen/
+    // Fahrzeugen spart das spürbar Datenbank-I/O und Payload-Größe.
     const vehicles = await prisma.vehicle.findMany({
       where: vehicleWhere,
-      include: {
-        serviceEntries: true,
-        reminderRules: { where: { active: true } },
-        mileageEntries: { orderBy: { date: 'asc' } },
+      select: {
+        id: true,
+        licensePlate: true,
+        make: true,
+        model: true,
+        currentMileage: true,
+        headerImage: true,
+        tags: true,
+        serviceEntries: { select: { date: true, cost: true } },
+        mileageEntries: { select: { date: true, mileage: true }, orderBy: { date: 'asc' } },
+        reminderRules: {
+          where: { active: true },
+          select: { id: true, type: true, label: true, dueDate: true, dueMileage: true },
+        },
       },
     });
 

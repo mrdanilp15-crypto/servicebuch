@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 
 const authRoutes = require('./routes/auth.routes');
@@ -17,6 +18,10 @@ const app = express();
 
 app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(cors({ origin: process.env.FRONTEND_URL || '*', credentials: true }));
+// Komprimiert JSON/Text-Antworten (z.B. das Dashboard mit vielen
+// Service-/Kilometerstand-Einträgen). Bilder/PDFs werden automatisch
+// übersprungen (schon komprimierte Formate, keine Doppelarbeit).
+app.use(compression());
 app.use(express.json({ limit: '2mb' }));
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 

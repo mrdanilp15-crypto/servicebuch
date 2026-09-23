@@ -270,6 +270,23 @@ Start hinzufügen** (bzw. der Browser zeigt von selbst einen Installations-Hinwe
 - Rate-Limiting auf Auth-Routen und global über `express-rate-limit`, Security-Header über
   `helmet`.
 
+## Performance
+
+- **Datenbank**: Indizes auf allen Fremdschlüssel-Spalten (`vehicleId`, `userId`, ...), damit
+  Abfragen wie "alle Service-Einträge eines Fahrzeugs" keinen Full-Table-Scan brauchen.
+  SQLite läuft im **WAL-Modus** (`backend/src/lib/prisma.js`, einmalig beim ersten Start
+  aktiviert) statt im Standard-Rollback-Journal – dadurch blockieren sich lesende und
+  schreibende Zugriffe nicht mehr gegenseitig (relevant z. B. wenn der tägliche
+  Erinnerungs-Cronjob läuft, während gerade jemand die App nutzt).
+- **API**: JSON-Antworten werden gzip-komprimiert (`compression`-Middleware). Das
+  Dashboard fragt nur die tatsächlich benötigten Felder ab statt kompletter
+  Service-/Kilometerstand-Objekte.
+- **Bilder/PDFs** (`GET /api/attachments/:id`): aggressives `Cache-Control`
+  (`private, max-age=31536000, immutable`) – der Inhalt hinter einer Anhang-ID ändert sich nie,
+  ein Ersetzen legt immer eine neue ID an. Zusätzlich cacht das Frontend (`AuthImage.js`)
+  jedes Bild pro Sitzung nur einmal im Speicher, auch über Navigation zwischen Seiten hinweg,
+  statt es bei jeder Anzeige erneut zu laden und zu entschlüsseln.
+
 ## Deployment in Produktion
 
 Alle drei Docker-Wege oben (Portainer, Docker Desktop, `docker compose up -d --build`) landen

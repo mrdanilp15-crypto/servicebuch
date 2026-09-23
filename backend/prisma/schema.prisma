@@ -71,6 +71,7 @@ model VehicleAssignment {
   vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 
   @@unique([userId, vehicleId])
+  @@index([vehicleId])
 }
 
 model VehicleImage {
@@ -81,6 +82,8 @@ model VehicleImage {
   createdAt DateTime @default(now())
 
   vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId])
 }
 
 model ServiceEntry {
@@ -101,6 +104,8 @@ model ServiceEntry {
 
   vehicle     Vehicle      @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   attachments Attachment[]
+
+  @@index([vehicleId])
 }
 
 model Attachment {
@@ -118,6 +123,9 @@ model Attachment {
 
   vehicle      Vehicle       @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   serviceEntry ServiceEntry? @relation(fields: [serviceEntryId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId])
+  @@index([serviceEntryId])
 }
 
 model MileageEntry {
@@ -130,6 +138,8 @@ model MileageEntry {
   createdAt DateTime @default(now())
 
   vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId])
 }
 
 model ReminderRule {
@@ -147,6 +157,8 @@ model ReminderRule {
   updatedAt        DateTime  @updatedAt
 
   vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId])
 }
 
 model Notification {
@@ -161,6 +173,9 @@ model Notification {
 
   user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   vehicle Vehicle? @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([vehicleId])
 }
 
 model PushSubscription {
@@ -172,4 +187,6 @@ model PushSubscription {
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
