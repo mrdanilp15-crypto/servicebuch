@@ -41,10 +41,10 @@ export default function DashboardPage() {
   return (
     <div>
       <Header title="Dashboard" />
-      <div className="p-4 lg:p-8 space-y-4 lg:space-y-6">
+      <div className="p-4 md:p-6 lg:p-8 space-y-4 lg:space-y-6">
         <PushManager />
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 lg:gap-4">
           <div className="card text-center lg:py-6">
             <p className="text-2xl lg:text-4xl font-bold">{data.totalVehicles}</p>
             <p className="text-xs lg:text-sm text-gray-500 mt-1">Fahrzeuge</p>
@@ -89,7 +89,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start space-y-4 lg:space-y-0">
+        <div className="md:grid md:grid-cols-2 md:gap-6 md:items-start space-y-4 md:space-y-0">
           <div className="card">
             <h2 className="font-semibold mb-1">Fällige Services</h2>
             <p className="text-xs text-gray-400 mb-2">Erinnerungen, die in den nächsten 30 Tagen bzw. 1.000 km fällig werden.</p>

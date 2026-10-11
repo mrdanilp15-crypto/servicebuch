@@ -10,9 +10,9 @@ const ROLE_LABELS = {
 };
 
 const ROLE_HELP = {
-  OWNER: 'Besitzer – voller Zugriff, kann Zugriff vergeben und das Fahrzeug löschen',
-  EDITOR: 'Bearbeiter – darf Einträge anlegen und ändern',
-  VIEWER: 'Betrachter – darf nur ansehen und PDF exportieren',
+  OWNER: 'Besitzer – voller Zugriff',
+  EDITOR: 'Bearbeiter – darf ändern',
+  VIEWER: 'Betrachter – nur ansehen',
 };
 
 // Zeigt, wer Zugriff auf das Fahrzeug hat (mit Rolle). Besitzer (und Admins)
@@ -83,8 +83,8 @@ export default function AssignmentBox({ vehicleId, assignments = [], onChange, c
       {assignments.length > 0 ? (
         <ul className="space-y-1.5">
           {assignments.map((a) => (
-            <li key={a.id} className="flex items-center justify-between gap-2 rounded-lg bg-gray-50 px-3 py-2 text-sm">
-              <div className="min-w-0">
+            <li key={a.id} className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 rounded-lg bg-gray-50 px-3 py-2 text-sm">
+              <div className="min-w-0 flex-1 basis-40">
                 <p className="truncate font-medium">{a.user?.name || 'Unbekannt'}</p>
                 <p className="truncate text-xs text-gray-500">{a.user?.email}</p>
               </div>
@@ -114,6 +114,10 @@ export default function AssignmentBox({ vehicleId, assignments = [], onChange, c
       {canManage && users.length > 0 && (
         <form onSubmit={assign} className="space-y-2 border-t border-gray-100 pt-3">
           <p className="text-xs text-gray-500">Weitere Person hinzufügen oder Rolle ändern:</p>
+          <p className="text-[11px] leading-snug text-gray-400">
+            Besitzer: alles inkl. Zugriff vergeben und Fahrzeug löschen. Bearbeiter: Einträge anlegen und ändern.
+            Betrachter: ansehen und PDF exportieren.
+          </p>
           <select
             className="input"
             required

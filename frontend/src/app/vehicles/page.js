@@ -29,9 +29,9 @@ export default function VehiclesPage() {
   return (
     <div>
       <Header title="Fahrzeuge" />
-      <div className="p-4 lg:p-8 space-y-4">
+      <div className="p-4 md:p-6 lg:p-8 space-y-4">
         {availableTags.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto pb-1">
+          <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
             <button
               onClick={() => setFilter(null)}
               className={`shrink-0 rounded-full px-3 py-1 text-xs ${
@@ -56,7 +56,7 @@ export default function VehiclesPage() {
 
         {error && <p className="text-red-600 text-sm">{error}</p>}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
           {filtered.map((v) => (
             <Link key={v.id} href={`/vehicles/${v.id}`} className="card flex gap-3 items-center">
               <AuthImage

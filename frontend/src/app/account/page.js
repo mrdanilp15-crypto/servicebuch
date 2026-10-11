@@ -83,7 +83,7 @@ export default function AccountPage() {
   return (
     <div>
       <Header title="Mein Konto" />
-      <div className="space-y-4 p-4 lg:max-w-3xl lg:p-8 lg:space-y-6">
+      <div className="space-y-4 p-4 md:max-w-3xl md:p-6 lg:p-8 lg:space-y-6">
         <div className="card flex items-center gap-4">
           <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-600">
             <Icon name="user" className="h-7 w-7" />

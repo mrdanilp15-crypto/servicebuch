@@ -10,7 +10,7 @@ export default function Header({ title, back = false, actions = null }) {
   const router = useRouter();
 
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between gap-3 bg-white/90 backdrop-blur px-4 py-3 lg:px-8 lg:py-6 border-b border-gray-200">
+    <header className="sticky short:static top-0 z-30 flex h-[57px] lg:h-[89px] items-center justify-between gap-3 bg-white/90 backdrop-blur px-4 md:px-6 lg:px-8 border-b border-gray-200">
       <div className="flex items-center gap-2 min-w-0">
         {back && (
           <button

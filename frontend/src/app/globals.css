@@ -19,6 +19,13 @@ body {
   outline-offset: 2px;
 }
 
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 .card {
   @apply bg-white rounded-2xl shadow-sm border border-gray-100 p-4;
 }
@@ -37,6 +44,17 @@ body {
 
 .label {
   @apply block text-sm font-medium text-gray-600 mb-1;
+}
+
+/* Touch-Geräte: reine Text-Buttons ("Bearbeiten", "Löschen", ...) haben kein
+   eigenes Padding und wären nur ~16px hoch - zu klein zum sicheren Antippen.
+   Buttons mit eigenem Padding (Pills, Icon-Buttons, .btn-*) bleiben unberührt. */
+@media (pointer: coarse) {
+  button:not(.btn-primary):not(.btn-secondary):not([role='tab']):not([class*='p-']):not([class*='px-']):not([class*='py-']):not([class*='w-5']) {
+    min-height: 36px;
+    padding-inline: 8px;
+    margin-inline: -4px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

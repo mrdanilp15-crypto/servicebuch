@@ -173,7 +173,7 @@ export default function ServicesTab({ vehicle, canEdit = true }) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         {canEdit && (
-          <button onClick={() => (showForm ? closeForm() : openCreate())} className="btn-primary flex-1 lg:flex-none lg:px-8">
+          <button onClick={() => (showForm ? closeForm() : openCreate())} className="btn-primary flex-1 whitespace-nowrap md:flex-none md:px-8">
             {showForm ? 'Abbrechen' : '+ Service-Eintrag'}
           </button>
         )}
@@ -183,7 +183,7 @@ export default function ServicesTab({ vehicle, canEdit = true }) {
           className="btn-secondary inline-flex items-center gap-2"
         >
           <Icon name="document" className="h-5 w-5" />
-          {pdfBusy === 'all' ? 'Wird erstellt…' : 'Servicebuch als PDF'}
+          {pdfBusy === 'all' ? 'Wird erstellt…' : (<><span className="sm:hidden">PDF</span><span className="hidden sm:inline">Servicebuch als PDF</span></>)}
         </button>
         <label className="flex items-center gap-1.5 text-xs text-gray-500">
           <input type="checkbox" checked={pdfImages} onChange={(e) => setPdfImages(e.target.checked)} />
@@ -197,7 +197,7 @@ export default function ServicesTab({ vehicle, canEdit = true }) {
       )}
 
       {showForm && (
-        <form onSubmit={submit} className="card space-y-3 lg:max-w-2xl">
+        <form onSubmit={submit} className="card space-y-3 md:max-w-2xl">
           <h2 className="font-semibold">{editingId ? 'Eintrag bearbeiten' : 'Neuer Eintrag'}</h2>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -379,7 +379,7 @@ export default function ServicesTab({ vehicle, canEdit = true }) {
         </form>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {services.map((s) => (
           <div key={s.id} className="card">
             <div className="flex justify-between items-start">

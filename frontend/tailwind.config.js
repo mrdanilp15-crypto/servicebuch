@@ -3,6 +3,8 @@ module.exports = {
   content: ['./src/app/**/*.{js,jsx}', './src/components/**/*.{js,jsx}'],
   theme: {
     extend: {
+      // Querformat auf dem Handy (wenig Höhe): feste Leisten sparen Platz.
+      screens: { short: { raw: '(max-height: 500px)' } },
       colors: {
         brand: {
           50: '#eff6ff',

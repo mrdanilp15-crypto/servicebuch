@@ -26,7 +26,7 @@ export default function BottomNav() {
       aria-label="Hauptnavigation"
       className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 pb-[env(safe-area-inset-bottom)] lg:hidden"
     >
-      <div className="mx-auto flex max-w-lg justify-around">
+      <div className="mx-auto flex max-w-xl justify-around">
         {items.map((item) => {
           let active = pathname === item.href;
           if (!active && item.href === '/vehicles') {
@@ -37,12 +37,12 @@ export default function BottomNav() {
               key={item.href}
               href={item.href}
               aria-current={active ? 'page' : undefined}
-              className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-xs ${
+              className={`flex flex-1 flex-col items-center gap-0.5 py-2 short:py-1 text-xs ${
                 active ? 'text-brand-600 font-semibold' : 'text-gray-500'
               }`}
             >
               <Icon name={item.icon} className="h-6 w-6" strokeWidth={active ? 2 : 1.7} />
-              {item.label}
+              <span className="short:sr-only">{item.label}</span>
             </Link>
           );
         })}

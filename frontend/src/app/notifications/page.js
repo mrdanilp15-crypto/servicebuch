@@ -54,8 +54,8 @@ export default function NotificationsPage() {
   return (
     <div>
       <Header title="Benachrichtigungen" />
-      <div className="p-4 lg:p-8 space-y-3">
-        <div className="flex gap-2 lg:max-w-md">
+      <div className="p-4 md:p-6 lg:p-8 space-y-3">
+        <div className="flex gap-2 md:max-w-md">
           <button onClick={markAllRead} className="btn-secondary flex-1 text-sm">
             Alle gelesen
           </button>
@@ -66,7 +66,7 @@ export default function NotificationsPage() {
 
         {error && <p className="text-sm text-red-600">{error}</p>}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {items.map((n) => (
           <div key={n.id} className={`card ${!n.read ? 'border-brand-200 bg-brand-50' : ''}`}>
             <div className="flex justify-between items-start">

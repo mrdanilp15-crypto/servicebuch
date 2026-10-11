@@ -55,7 +55,7 @@ export default function NewVehiclePage() {
   return (
     <div>
       <Header title="Neues Fahrzeug" back />
-      <form onSubmit={onSubmit} className="p-4 lg:p-8 lg:max-w-2xl space-y-4">
+      <form onSubmit={onSubmit} className="p-4 md:p-6 lg:p-8 md:max-w-2xl space-y-4">
         <div className="card space-y-3">
           <div>
             <label className="label">Kennzeichen *</label>

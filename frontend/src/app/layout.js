@@ -35,7 +35,7 @@ export default function RootLayout({ children }) {
           <div className="lg:flex">
             <Sidebar />
             <div className="min-h-screen flex-1 bg-gray-100 pb-20 lg:pb-0">
-              <div className="mx-auto max-w-lg lg:max-w-7xl">{children}</div>
+              <div className="mx-auto w-full lg:max-w-[1800px]">{children}</div>
             </div>
           </div>
           <BottomNav />

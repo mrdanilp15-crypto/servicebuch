@@ -61,10 +61,10 @@ export default function OverviewTab({ vehicle, onChange, canEdit = true, isOwner
   );
 
   return (
-    <div className="space-y-4 lg:grid lg:grid-cols-5 lg:gap-6 lg:space-y-0 lg:items-start">
-      <div className="lg:col-span-2 space-y-4">
+    <div className="space-y-4 md:grid md:grid-cols-5 md:gap-6 md:space-y-0 md:items-start">
+      <div className="md:col-span-2 space-y-4">
         <div className="relative">
-          <AuthImage attachmentId={vehicle.headerImage} className="w-full h-48 lg:h-64 object-cover rounded-2xl" />
+          <AuthImage attachmentId={vehicle.headerImage} className="w-full h-48 md:h-56 lg:h-64 object-cover rounded-2xl" />
           {canEdit && (
             <>
               <button
@@ -92,10 +92,10 @@ export default function OverviewTab({ vehicle, onChange, canEdit = true, isOwner
           </p>
         )}
 
-        <div className="hidden lg:block">{assignmentBox}</div>
+        <div className="hidden md:block">{assignmentBox}</div>
       </div>
 
-      <div className="card space-y-3 lg:col-span-3">
+      <div className="card space-y-3 md:col-span-3">
         <div className="flex justify-between items-center">
           <h2 className="font-semibold">Fahrzeugdaten</h2>
           {canEdit && (
@@ -139,7 +139,7 @@ export default function OverviewTab({ vehicle, onChange, canEdit = true, isOwner
         )}
       </div>
 
-      <div className="lg:hidden">{assignmentBox}</div>
+      <div className="md:hidden">{assignmentBox}</div>
     </div>
   );
 }

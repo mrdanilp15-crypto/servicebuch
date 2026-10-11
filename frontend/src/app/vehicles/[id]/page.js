@@ -61,7 +61,7 @@ export default function VehicleDetailPage() {
       <div
         role="tablist"
         aria-label="Fahrzeugbereiche"
-        className="flex gap-1 lg:gap-2 overflow-x-auto px-4 lg:px-8 pt-3 pb-1 sticky top-[57px] lg:top-[89px] bg-gray-100 z-20"
+        className="no-scrollbar flex gap-1 lg:gap-2 overflow-x-auto px-4 md:px-6 lg:px-8 pt-3 pb-1 sticky short:static top-[57px] lg:top-[89px] bg-gray-100 z-20"
       >
         {TABS.map((t) => (
           <button
@@ -78,7 +78,7 @@ export default function VehicleDetailPage() {
         ))}
       </div>
 
-      <div className="p-4 lg:p-8">
+      <div className="p-4 md:p-6 lg:p-8">
         {!canEdit && (
           <p className="mb-4 rounded-xl bg-blue-50 px-4 py-2.5 text-sm text-blue-800">
             Du hast hier nur Leserechte (Betrachter): Einträge ansehen und PDF exportieren ist möglich, ändern nicht.
@@ -94,7 +94,7 @@ export default function VehicleDetailPage() {
         {tab === 'overview' && isOwner && (
           <>
             {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
-            <button onClick={deleteVehicle} className="w-full mt-4 text-sm text-red-600 py-2 lg:max-w-2xl lg:block">
+            <button onClick={deleteVehicle} className="w-full mt-4 text-sm text-red-600 py-2 md:max-w-2xl md:block">
               Fahrzeug löschen
             </button>
           </>

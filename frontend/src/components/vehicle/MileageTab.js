@@ -71,7 +71,7 @@ export default function MileageTab({ vehicle, canEdit = true }) {
       </div>
 
       {canEdit && (
-      <div className="lg:grid lg:grid-cols-2 lg:gap-4 space-y-4 lg:space-y-0">
+      <div className="md:grid md:grid-cols-2 md:gap-4 space-y-4 md:space-y-0">
         <div className="card space-y-3">
           <h2 className="font-semibold">Manuelle Eingabe</h2>
           <form onSubmit={addManual} className="flex gap-2">

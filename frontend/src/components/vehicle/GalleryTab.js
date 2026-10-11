@@ -48,7 +48,7 @@ export default function GalleryTab({ vehicle, canEdit = true }) {
   return (
     <div className="space-y-4">
       {canEdit && (
-        <button onClick={() => fileRef.current?.click()} disabled={uploading} className="btn-primary w-full lg:w-auto lg:max-w-xs">
+        <button onClick={() => fileRef.current?.click()} disabled={uploading} className="btn-primary w-full md:w-auto md:max-w-xs">
           {uploading ? 'Lädt…' : '+ Fotos hinzufügen'}
         </button>
       )}
@@ -62,7 +62,7 @@ export default function GalleryTab({ vehicle, canEdit = true }) {
       />
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2">
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
         {images.map((img) => (
           <div key={img.id} className="relative aspect-square">
             <AuthImage attachmentId={img.url} className="w-full h-full object-cover rounded-lg" />

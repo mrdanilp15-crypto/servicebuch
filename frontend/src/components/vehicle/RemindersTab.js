@@ -120,14 +120,14 @@ export default function RemindersTab({ vehicle, canEdit = true }) {
   return (
     <div className="space-y-4">
       {canEdit && (
-        <button onClick={() => setShowForm((s) => !s)} className="btn-primary w-full lg:w-auto lg:max-w-2xl">
+        <button onClick={() => setShowForm((s) => !s)} className="btn-primary w-full md:w-auto md:max-w-2xl">
           {showForm ? 'Abbrechen' : '+ Erinnerung hinzufügen'}
         </button>
       )}
       {!showForm && error && <p className="text-sm text-red-600">{error}</p>}
 
       {showForm && (
-        <form onSubmit={submit} className="card space-y-3 lg:max-w-2xl">
+        <form onSubmit={submit} className="card space-y-3 md:max-w-2xl">
           <div>
             <label className="label">Wofür?</label>
             <select className="input" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
@@ -232,7 +232,7 @@ export default function RemindersTab({ vehicle, canEdit = true }) {
         </form>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
         {rules.map((r) => (
           <div key={r.id} className={`card flex items-center justify-between ${!r.active ? 'opacity-50' : ''}`}>
             <div>
@@ -263,7 +263,7 @@ export default function RemindersTab({ vehicle, canEdit = true }) {
           </div>
         ))}
         {rules.length === 0 && (
-          <p className="text-sm text-gray-400 text-center py-6 lg:col-span-2">Keine Erinnerungen angelegt.</p>
+          <p className="text-sm text-gray-400 text-center py-6 md:col-span-2">Keine Erinnerungen angelegt.</p>
         )}
       </div>
     </div>

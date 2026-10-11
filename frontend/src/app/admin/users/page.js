@@ -103,11 +103,12 @@ export default function AdminUsersPage() {
         actions={
           <button onClick={() => setShowForm((s) => !s)} className="btn-primary flex items-center gap-1.5 !px-3 !py-2 text-sm">
             <Icon name="plus" className="h-4 w-4" />
-            <span>{showForm ? 'Abbrechen' : 'Benutzer anlegen'}</span>
+            <span className="hidden sm:inline">{showForm ? 'Abbrechen' : 'Benutzer anlegen'}</span>
+            <span className="sm:hidden">{showForm ? 'Abbrechen' : 'Neu'}</span>
           </button>
         }
       />
-      <div className="space-y-4 p-4 lg:max-w-3xl lg:p-8">
+      <div className="space-y-4 p-4 md:max-w-3xl md:p-6 lg:p-8">
         {error && (
           <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
             {error}
