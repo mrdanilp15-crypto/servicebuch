@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../components/AuthProvider';
+import PublicShell, { BrandHeader } from '../../components/PublicShell';
+import { apiFetch } from '../../lib/api';
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -12,6 +14,15 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [registrationOpen, setRegistrationOpen] = useState(false);
+
+  // Der Registrieren-Link wird nur gezeigt, wenn die Registrierung offen ist
+  // (nur beim allerersten Konto bzw. wenn der Betreiber sie freigegeben hat).
+  useEffect(() => {
+    apiFetch('/auth/status')
+      .then((s) => setRegistrationOpen(!!s.registrationOpen))
+      .catch(() => {});
+  }, []);
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -28,28 +39,31 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col justify-center px-6 py-12">
-      <div className="mb-8 text-center">
-        <div className="text-4xl mb-2">🚗</div>
-        <h1 className="text-2xl font-bold">Digitales Servicebuch</h1>
-        <p className="text-gray-500 text-sm mt-1">Melde dich an, um fortzufahren.</p>
-      </div>
+    <PublicShell>
+      <BrandHeader title="Digitales Servicebuch" subtitle="Melde dich an, um fortzufahren." />
 
-      <form onSubmit={onSubmit} className="space-y-4 card">
+      <form onSubmit={onSubmit} className="card space-y-4 sm:p-6">
         <div>
-          <label className="label">E-Mail</label>
+          <label className="label" htmlFor="email">
+            E-Mail
+          </label>
           <input
+            id="email"
             className="input"
             type="email"
             required
+            autoFocus
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="email"
           />
         </div>
         <div>
-          <label className="label">Passwort</label>
+          <label className="label" htmlFor="password">
+            Passwort
+          </label>
           <input
+            id="password"
             className="input"
             type="password"
             required
@@ -58,18 +72,28 @@ export default function LoginPage() {
             autoComplete="current-password"
           />
         </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && (
+          <p role="alert" className="text-sm text-red-600">
+            {error}
+          </p>
+        )}
         <button type="submit" disabled={loading} className="btn-primary w-full">
           {loading ? 'Anmelden…' : 'Anmelden'}
         </button>
       </form>
 
-      <p className="mt-6 text-center text-sm text-gray-500">
-        Noch kein Konto?{' '}
-        <Link href="/register" className="text-brand-600 font-medium">
-          Registrieren
-        </Link>
-      </p>
-    </div>
+      {registrationOpen ? (
+        <p className="mt-6 text-center text-sm text-gray-500">
+          Noch kein Konto?{' '}
+          <Link href="/register" className="text-brand-600 font-medium">
+            Registrieren
+          </Link>
+        </p>
+      ) : (
+        <p className="mt-6 text-center text-xs text-gray-400">
+          Kein Konto? Neue Zugänge legt der Administrator dieser Instanz an.
+        </p>
+      )}
+    </PublicShell>
   );
 }

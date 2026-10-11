@@ -4,18 +4,23 @@ import { useEffect, useState } from 'react';
 import { apiFetch } from '../../lib/api';
 
 const ROLE_LABELS = {
-  OWNER: 'Owner (voller Zugriff)',
-  EDITOR: 'Editor (bearbeiten)',
-  VIEWER: 'Viewer (nur ansehen)',
+  OWNER: 'Besitzer',
+  EDITOR: 'Bearbeiter',
+  VIEWER: 'Betrachter',
 };
 
-// Zeigt, wer einem Fahrzeug bereits zugewiesen ist (mit Rolle + Entfernen-
-// Button) und erlaubt, weitere Benutzer zuzuweisen. Wählt man einen
-// bereits zugewiesenen Benutzer erneut aus, wird dessen Rolle aktualisiert
-// statt eine zweite (doppelte) Zuweisung anzulegen - das verhindert auch
-// das Backend (Upsert auf userId+vehicleId), aber die UI macht das jetzt
-// sichtbar statt es zu verschleiern.
-export default function AssignmentBox({ vehicleId, assignments = [], onChange }) {
+const ROLE_HELP = {
+  OWNER: 'Besitzer – voller Zugriff, kann Zugriff vergeben und das Fahrzeug löschen',
+  EDITOR: 'Bearbeiter – darf Einträge anlegen und ändern',
+  VIEWER: 'Betrachter – darf nur ansehen und PDF exportieren',
+};
+
+// Zeigt, wer Zugriff auf das Fahrzeug hat (mit Rolle). Besitzer (und Admins)
+// können außerdem Zugriff vergeben, ändern und entfernen; alle anderen sehen
+// nur die Liste. Wählt man einen bereits zugewiesenen Benutzer erneut aus,
+// wird dessen Rolle aktualisiert statt eine zweite (doppelte) Zuweisung
+// anzulegen - das verhindert auch das Backend (Upsert auf userId+vehicleId).
+export default function AssignmentBox({ vehicleId, assignments = [], onChange, canManage = false }) {
   const [users, setUsers] = useState([]);
   const [userId, setUserId] = useState('');
   const [role, setRole] = useState('VIEWER');
@@ -23,10 +28,11 @@ export default function AssignmentBox({ vehicleId, assignments = [], onChange })
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
+    if (!canManage) return;
     apiFetch('/users')
       .then(setUsers)
       .catch((e) => setError(e.message));
-  }, []);
+  }, [canManage]);
 
   const existingFor = (uid) => assignments.find((a) => a.userId === uid);
 
@@ -58,7 +64,7 @@ export default function AssignmentBox({ vehicleId, assignments = [], onChange })
   };
 
   const remove = async (uid) => {
-    if (!confirm('Zuweisung wirklich entfernen?')) return;
+    if (!confirm('Zugriff wirklich entfernen?')) return;
     setError('');
     try {
       await apiFetch(`/vehicles/${vehicleId}/assign/${uid}`, { method: 'DELETE' });
@@ -72,23 +78,25 @@ export default function AssignmentBox({ vehicleId, assignments = [], onChange })
 
   return (
     <div className="card space-y-3">
-      <h2 className="font-semibold">Fahrzeug zuweisen</h2>
+      <h2 className="font-semibold">Zugriff auf dieses Fahrzeug</h2>
 
       {assignments.length > 0 ? (
         <ul className="space-y-1.5">
           {assignments.map((a) => (
-            <li key={a.id} className="flex items-center justify-between text-sm rounded-lg bg-gray-50 px-3 py-2">
+            <li key={a.id} className="flex items-center justify-between gap-2 rounded-lg bg-gray-50 px-3 py-2 text-sm">
               <div className="min-w-0">
-                <p className="font-medium truncate">{a.user?.name || 'Unbekannt'}</p>
-                <p className="text-xs text-gray-500 truncate">{a.user?.email}</p>
+                <p className="truncate font-medium">{a.user?.name || 'Unbekannt'}</p>
+                <p className="truncate text-xs text-gray-500">{a.user?.email}</p>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <span className="text-xs bg-brand-50 text-brand-700 rounded-full px-2 py-0.5">
-                  {a.role}
+              <div className="flex shrink-0 items-center gap-2">
+                <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs text-brand-700">
+                  {ROLE_LABELS[a.role] || a.role}
                 </span>
-                <button onClick={() => remove(a.userId)} className="text-red-600 text-xs">
-                  Entfernen
-                </button>
+                {canManage && (
+                  <button onClick={() => remove(a.userId)} className="text-xs text-red-600">
+                    Entfernen
+                  </button>
+                )}
               </div>
             </li>
           ))}
@@ -97,9 +105,22 @@ export default function AssignmentBox({ vehicleId, assignments = [], onChange })
         <p className="text-sm text-gray-400">Noch niemandem zugewiesen.</p>
       )}
 
-      {users.length > 0 && (
-        <form onSubmit={assign} className="space-y-2 pt-1 border-t border-gray-100">
-          <select className="input" required value={userId} onChange={(e) => onSelectUser(e.target.value)}>
+      {error && (
+        <p role="alert" className="text-sm text-red-600">
+          {error}
+        </p>
+      )}
+
+      {canManage && users.length > 0 && (
+        <form onSubmit={assign} className="space-y-2 border-t border-gray-100 pt-3">
+          <p className="text-xs text-gray-500">Weitere Person hinzufügen oder Rolle ändern:</p>
+          <select
+            className="input"
+            required
+            aria-label="Benutzer"
+            value={userId}
+            onChange={(e) => onSelectUser(e.target.value)}
+          >
             <option value="" disabled>
               Benutzer wählen…
             </option>
@@ -108,21 +129,20 @@ export default function AssignmentBox({ vehicleId, assignments = [], onChange })
               return (
                 <option key={u.id} value={u.id}>
                   {u.name} ({u.email})
-                  {existing ? ` — bereits: ${existing.role}` : ''}
+                  {existing ? ` – bereits: ${ROLE_LABELS[existing.role]}` : ''}
                 </option>
               );
             })}
           </select>
-          <select className="input" value={role} onChange={(e) => setRole(e.target.value)}>
-            {Object.entries(ROLE_LABELS).map(([value, label]) => (
+          <select className="input" aria-label="Rolle" value={role} onChange={(e) => setRole(e.target.value)}>
+            {Object.entries(ROLE_HELP).map(([value, label]) => (
               <option key={value} value={value}>
                 {label}
               </option>
             ))}
           </select>
-          {error && <p className="text-sm text-red-600">{error}</p>}
           <button type="submit" disabled={busy} className="btn-secondary w-full">
-            {busy ? 'Speichern…' : selectedExisting ? 'Rolle aktualisieren' : 'Zuweisen'}
+            {busy ? 'Speichern…' : selectedExisting ? 'Rolle aktualisieren' : 'Zugriff geben'}
           </button>
         </form>
       )}

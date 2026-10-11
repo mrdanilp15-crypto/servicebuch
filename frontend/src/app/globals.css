@@ -10,6 +10,13 @@ body {
 body {
   background-color: #f3f4f6;
   color: #111827;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Sichtbarer Tastaturfokus für alle bedienbaren Elemente (Barrierefreiheit). */
+:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
 }
 
 .card {
@@ -17,17 +24,24 @@ body {
 }
 
 .btn-primary {
-  @apply bg-brand-600 text-white rounded-xl px-4 py-2.5 font-medium active:scale-[0.98] transition disabled:opacity-50;
+  @apply bg-brand-600 text-white rounded-xl px-4 py-2.5 font-medium transition hover:bg-brand-700 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed;
 }
 
 .btn-secondary {
-  @apply bg-gray-100 text-gray-700 rounded-xl px-4 py-2.5 font-medium active:scale-[0.98] transition disabled:opacity-50;
+  @apply bg-gray-100 text-gray-700 rounded-xl px-4 py-2.5 font-medium transition hover:bg-gray-200 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed;
 }
 
 .input {
-  @apply w-full rounded-xl border border-gray-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent;
+  @apply w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent;
 }
 
 .label {
   @apply block text-sm font-medium text-gray-600 mb-1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

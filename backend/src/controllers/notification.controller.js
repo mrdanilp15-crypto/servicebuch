@@ -36,10 +36,10 @@ async function markAllRead(req, res, next) {
   }
 }
 
-// Manueller Trigger, z.B. für Tests oder einen "jetzt prüfen" Button im UI.
+// Manueller Trigger ("Jetzt prüfen" im UI) - prüft nur die Fahrzeuge des Nutzers.
 async function runCheck(req, res, next) {
   try {
-    const created = await checkReminders();
+    const created = await checkReminders({ forUser: req.user });
     res.json({ created: created.length });
   } catch (err) {
     next(err);

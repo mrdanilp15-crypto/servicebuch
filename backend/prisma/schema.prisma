@@ -30,6 +30,9 @@ model User {
   password     String
   name         String
   role         String   @default("USER")
+  // Wird bei Passwortänderung/-reset hochgezählt und macht alle bisher
+  // ausgestellten Login-Tokens des Nutzers ungültig (siehe middleware/auth.js).
+  tokenVersion Int      @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -45,7 +48,7 @@ model Vehicle {
   model         String
   year          Int?
   vin           String?
-  tags          String   @default("") // comma-separated: Privat,Firma,Feuerwehr,Projekt
+  tags          String   @default("") // comma-separated, frei wählbar (z.B. Privat,Firma)
   headerImage   String? // path to profile/header image
   currentMileage Int     @default(0)
   createdAt     DateTime @default(now())

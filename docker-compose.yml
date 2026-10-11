@@ -16,33 +16,62 @@ version: '3.8'
 # selbst und speichert sie im Volume "servicebuch_data", damit sie über
 # Neustarts/Redeploys hinweg erhalten bleiben.
 #
-# Eigene Domain statt localhost? FRONTEND_URL unten anpassen (nur für CORS
-# relevant, kein Rebuild nötig). SQLite (Standard) braucht keine externe
-# Datenbank - für Postgres/MySQL: DATABASE_URL anpassen, provider in
-# backend/prisma/schema.prisma ändern und einen db-Service ergänzen.
+# Registrierung: Der ERSTE Nutzer registriert sich selbst und wird Admin.
+# Danach ist die Selbstregistrierung geschlossen - weitere Konten legt der
+# Admin unter "Benutzerverwaltung" an. (Wer bewusst offene Registrierung
+# will: REGISTRATION_OPEN auf 'true' setzen.)
+#
+# Rechtliches: Wird die App über das Internet erreichbar gemacht, trage
+# unten (LEGAL_OPERATOR_*) deine Anbieterangaben ein - sie erscheinen im
+# Impressum und in der Datenschutzerklärung (siehe README "Rechtliches").
+#
+# Wichtig - Datensicherung: Alles Wichtige liegt in den beiden Volumes
+# "servicebuch_data" (Datenbank + automatisch erzeugte Schlüssel) und
+# "servicebuch_uploads" (verschlüsselte Rechnungen/Fotos). Beide gehören
+# ZUSAMMEN gesichert - ohne die Schlüssel in "servicebuch_data" sind die
+# Uploads nicht mehr lesbar.
+#
+# SQLite (Standard) braucht keine externe Datenbank - für Postgres/MySQL:
+# DATABASE_URL anpassen, provider in backend/prisma/schema.prisma ändern
+# und einen db-Service ergänzen.
 #
 # Lokale Entwicklung mit dem geklonten Repo? docker-compose.override.yml
 # baut die Images automatisch aus dem Quellcode statt sie zu pullen, sobald
 # du "docker compose up -d --build" im Projektordner ausführst.
+
+x-logging: &default-logging
+  # Begrenzt die Log-Dateien, damit sie die Platte nicht über die Zeit füllen.
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '3'
 
 services:
   backend:
     image: ghcr.io/mrdanilp15-crypto/servicebuch-backend:latest
     pull_policy: always
     restart: unless-stopped
-    ports:
-      - '4000:4000'
+    # Kein "ports:" - das Backend ist bewusst nur intern (für das Frontend)
+    # erreichbar und nicht direkt aus dem Netzwerk ansprechbar.
+    logging: *default-logging
     environment:
       NODE_ENV: production
       PORT: 4000
-      FRONTEND_URL: http://localhost:3000
+      TZ: Europe/Berlin
       DATABASE_URL: file:/app/data/dev.db
       DATA_DIR: /app/data
       UPLOAD_DIR: /app/uploads
       MAX_UPLOAD_MB: 15
+      # Kontaktadresse, die Push-Diensten (Google/Mozilla/Apple) mitgeteilt wird.
       VAPID_SUBJECT: mailto:admin@example.com
       TUEV_WARNING_DAYS: 30
       SERVICE_INTERVAL_KM_WARNING: 1000
+      REGISTRATION_OPEN: 'false'
+      # Anbieterangaben für Impressum/Datenschutz (leer lassen bei rein privater Nutzung).
+      LEGAL_OPERATOR_NAME: ''
+      LEGAL_OPERATOR_ADDRESS: ''
+      LEGAL_OPERATOR_EMAIL: ''
+      LEGAL_OPERATOR_PHONE: ''
     volumes:
       - servicebuch_data:/app/data
       - servicebuch_uploads:/app/uploads
@@ -57,6 +86,7 @@ services:
     image: ghcr.io/mrdanilp15-crypto/servicebuch-frontend:latest
     pull_policy: always
     restart: unless-stopped
+    logging: *default-logging
     ports:
       - '3000:3000'
     environment:

@@ -6,11 +6,9 @@ import Header from '../../components/Header';
 import LineChart from '../../components/LineChart';
 import PushManager from '../../components/PushManager';
 import AuthImage from '../../components/AuthImage';
+import Icon from '../../components/Icon';
 import { apiFetch } from '../../lib/api';
-
-function fmtDate(d) {
-  return d ? new Date(d).toLocaleDateString('de-DE') : '-';
-}
+import { fmtDate, fmtKm, fmtMoneyRound } from '../../lib/format';
 
 export default function DashboardPage() {
   const [data, setData] = useState(null);
@@ -52,7 +50,7 @@ export default function DashboardPage() {
             <p className="text-xs lg:text-sm text-gray-500 mt-1">Fahrzeuge</p>
           </div>
           <div className="card text-center lg:py-6">
-            <p className="text-2xl lg:text-4xl font-bold">{selectedCost.currentYearCost.toFixed(0)} €</p>
+            <p className="text-2xl lg:text-4xl font-bold">{fmtMoneyRound(selectedCost.currentYearCost)}</p>
             <p className="text-xs lg:text-sm text-gray-500 mt-1">
               Kosten dieses Jahr{costFilter !== 'all' ? ' (gefiltert)' : ''}
             </p>
@@ -71,7 +69,10 @@ export default function DashboardPage() {
 
         {data.warnings.length > 0 && (
           <div className="card border-red-200 bg-red-50">
-            <h2 className="font-semibold text-red-700 mb-2">⚠ Überfällige Warnungen</h2>
+            <h2 className="mb-2 flex items-center gap-2 font-semibold text-red-700">
+              <Icon name="warning" className="h-5 w-5" />
+              Überfällige Warnungen
+            </h2>
             <p className="text-xs text-red-600/80 mb-2">
               Diese Termine sind bereits überschritten (Datum oder Kilometerstand liegt in der Vergangenheit).
             </p>
@@ -92,7 +93,10 @@ export default function DashboardPage() {
           <div className="card">
             <h2 className="font-semibold mb-1">Fällige Services</h2>
             <p className="text-xs text-gray-400 mb-2">Erinnerungen, die in den nächsten 30 Tagen bzw. 1.000 km fällig werden.</p>
-            {data.dueServices.length === 0 && <p className="text-sm text-gray-400">Nichts fällig 🎉</p>}
+            {data.dueServices.length === 0 && <p className="flex items-center gap-2 text-sm text-gray-400">
+                <Icon name="check" className="h-4 w-4 text-green-600" />
+                Nichts fällig – alles im grünen Bereich.
+              </p>}
             <ul className="space-y-2">
               {data.dueServices.map((s) => (
                 <li key={s.ruleId} className="flex justify-between text-sm border-b last:border-0 pb-2 last:pb-0">
@@ -104,7 +108,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="text-right text-gray-500 shrink-0 pl-3">
                     {s.dueDate && <p>{fmtDate(s.dueDate)}</p>}
-                    {s.dueMileage && <p>{s.dueMileage.toLocaleString('de-DE')} km</p>}
+                    {s.dueMileage != null && <p>{fmtKm(s.dueMileage)}</p>}
                   </div>
                 </li>
               ))}
@@ -127,7 +131,7 @@ export default function DashboardPage() {
                 ))}
               </select>
             </div>
-            <LineChart points={costPoints} formatY={(y) => `${y.toFixed(0)} €`} />
+            <LineChart points={costPoints} formatY={(y) => fmtMoneyRound(y)} />
           </div>
         </div>
 
@@ -152,7 +156,7 @@ export default function DashboardPage() {
                   </p>
                   <p className="text-xs text-gray-500 truncate">{v.licensePlate}</p>
                 </div>
-                <p className="text-xs text-gray-500 shrink-0">{v.currentMileage.toLocaleString('de-DE')} km</p>
+                <p className="text-xs text-gray-500 shrink-0">{fmtKm(v.currentMileage)}</p>
               </Link>
             ))}
           </div>

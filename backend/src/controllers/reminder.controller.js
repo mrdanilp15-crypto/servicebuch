@@ -1,6 +1,9 @@
 const { z } = require('zod');
 const prisma = require('../lib/prisma');
 
+const optionalInt = (max) =>
+  z.preprocess((v) => (v === '' ? null : v), z.coerce.number().int().min(0).max(max).optional().nullable());
+
 const reminderSchema = z.object({
   type: z.enum([
     'TUEV',
@@ -16,11 +19,11 @@ const reminderSchema = z.object({
     'KUPPLUNG',
     'CUSTOM',
   ]),
-  label: z.string().min(1),
-  dueDate: z.coerce.date().optional().nullable(),
-  dueMileage: z.coerce.number().int().optional().nullable(),
-  intervalMonths: z.coerce.number().int().optional().nullable(),
-  intervalKm: z.coerce.number().int().optional().nullable(),
+  label: z.string().trim().min(1, 'Bezeichnung fehlt.').max(150),
+  dueDate: z.preprocess((v) => (v === '' ? null : v), z.coerce.date().optional().nullable()),
+  dueMileage: optionalInt(9_999_999),
+  intervalMonths: optionalInt(600),
+  intervalKm: optionalInt(1_000_000),
   active: z.coerce.boolean().optional().default(true),
 });
 
@@ -51,7 +54,10 @@ async function createReminder(req, res, next) {
 async function updateReminder(req, res, next) {
   try {
     const data = reminderSchema.partial().parse(req.body);
-    const rule = await prisma.reminderRule.update({ where: { id: req.params.id }, data });
+    const rule = await prisma.reminderRule.update({
+      where: { id: req.params.id, vehicleId: req.params.vehicleId },
+      data,
+    });
     res.json(rule);
   } catch (err) {
     next(err);
@@ -60,7 +66,7 @@ async function updateReminder(req, res, next) {
 
 async function deleteReminder(req, res, next) {
   try {
-    await prisma.reminderRule.delete({ where: { id: req.params.id } });
+    await prisma.reminderRule.delete({ where: { id: req.params.id, vehicleId: req.params.vehicleId } });
     res.status(204).end();
   } catch (err) {
     next(err);

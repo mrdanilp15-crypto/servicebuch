@@ -5,6 +5,13 @@ const argon2 = require('argon2');
 const prisma = new PrismaClient();
 
 async function main() {
+  // Die Demo-Konten haben bekannte Passwörter - auf einem produktiven System
+  // wäre das ein offenes Scheunentor. Daher nur nach ausdrücklicher Freigabe.
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DEMO_SEED !== 'true') {
+    console.error('Seed abgebrochen: Die Demo-Daten enthalten Konten mit bekannten Passwörtern (nur für Entwicklung).');
+    process.exit(1);
+  }
+
   const adminPassword = await argon2.hash('Admin1234!', { type: argon2.argon2id });
   const userPassword = await argon2.hash('User1234!', { type: argon2.argon2id });
 
@@ -29,6 +36,12 @@ async function main() {
       role: 'USER',
     },
   });
+
+  // Mehrfaches Ausführen soll keine doppelten Beispielfahrzeuge erzeugen.
+  if (await prisma.vehicle.findFirst({ where: { licensePlate: 'M-AB 1234' } })) {
+    console.log('Beispieldaten sind bereits vorhanden - nichts zu tun.');
+    return;
+  }
 
   const golf = await prisma.vehicle.create({
     data: {

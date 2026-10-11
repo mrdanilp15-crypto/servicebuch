@@ -38,9 +38,17 @@ function isDue(rule, vehicle) {
   return false;
 }
 
-async function checkReminders() {
+// Nach dem ersten Hinweis wird bei weiterhin offener Fälligkeit nur noch alle
+// REMINDER_REPEAT_DAYS Tage erneut erinnert (statt jeden Tag dieselbe Meldung).
+const REPEAT_MS = Number(process.env.REMINDER_REPEAT_DAYS || 7) * 24 * 60 * 60 * 1000;
+
+// Optional auf die Fahrzeuge eines Nutzers eingeschränkt (für den
+// "Jetzt prüfen"-Button); ohne Angabe werden alle Fahrzeuge geprüft (Cronjob).
+async function checkReminders({ forUser } = {}) {
+  const vehicleFilter =
+    forUser && forUser.role !== 'ADMIN' ? { vehicle: { assignments: { some: { userId: forUser.id } } } } : {};
   const rules = await prisma.reminderRule.findMany({
-    where: { active: true },
+    where: { active: true, ...vehicleFilter },
     include: { vehicle: { include: { assignments: true } } },
   });
 
@@ -48,8 +56,7 @@ async function checkReminders() {
   for (const rule of rules) {
     if (!isDue(rule, rule.vehicle)) continue;
 
-    // Nicht öfter als 1x pro 24h für dieselbe Regel benachrichtigen.
-    if (rule.lastTriggeredAt && Date.now() - new Date(rule.lastTriggeredAt).getTime() < 24 * 60 * 60 * 1000) {
+    if (rule.lastTriggeredAt && Date.now() - new Date(rule.lastTriggeredAt).getTime() < REPEAT_MS) {
       continue;
     }
 

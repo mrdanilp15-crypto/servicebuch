@@ -25,6 +25,12 @@ async function apiFetch(path, { method = 'GET', body, isForm = false, headers = 
     body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
   });
 
+  // Abgelaufene/ungültige Sitzung: AuthProvider hört auf dieses Event und
+  // leitet zum Login. (Beim Login selbst bedeutet 401 nur "falsches Passwort".)
+  if (res.status === 401 && token && !path.startsWith('/auth/login') && typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('sb-unauthorized'));
+  }
+
   if (res.status === 204) return null;
 
   const contentType = res.headers.get('content-type') || '';
@@ -50,4 +56,36 @@ async function fetchAttachmentUrl(attachmentId) {
   return URL.createObjectURL(blob);
 }
 
-export { API_URL, apiFetch, fetchAttachmentUrl, getToken };
+// Lädt eine Datei (PDF, JSON-Export, ...) herunter und stößt den Browser-
+// Download an. Der Dateiname kommt vom Server (Content-Disposition); Fehler
+// werden als Exception mit lesbarer Meldung geworfen, damit die UI sie zeigen kann.
+async function downloadFile(path, fallbackName = 'download') {
+  const token = getToken();
+  const res = await fetch(`${API_URL}${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    let message = `Download fehlgeschlagen (Fehler ${res.status}).`;
+    try {
+      message = (await res.json()).error || message;
+    } catch {
+      // keine JSON-Antwort - Standardmeldung bleibt
+    }
+    throw new Error(message);
+  }
+  const disposition = res.headers.get('content-disposition') || '';
+  const match = /filename\*=UTF-8''([^;]+)/i.exec(disposition);
+  const filename = match ? decodeURIComponent(match[1]) : fallbackName;
+
+  const blob = await res.blob();
+  const objUrl = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = objUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(objUrl), 10000);
+}
+
+export { API_URL, apiFetch, downloadFile, fetchAttachmentUrl, getToken };

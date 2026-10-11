@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import AuthImage from '../AuthImage';
-import { apiFetch, API_URL, getToken } from '../../lib/api';
+import Icon from '../Icon';
+import { apiFetch, downloadFile } from '../../lib/api';
+import { fmtDate, fmtKm, fmtMoney } from '../../lib/format';
 
 const SERVICE_TYPES = ['Ölwechsel', 'Inspektion', 'TÜV / HU', 'Bremsen', 'Reifenwechsel', 'Reparatur', 'Sonstiges'];
 const CUSTOM_TYPE_OPTION = '__custom__';
@@ -20,22 +22,7 @@ const emptyForm = {
   recurringIntervalKm: '',
 };
 
-async function downloadPdf(url, filename) {
-  const token = getToken();
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-  if (!res.ok) return;
-  const blob = await res.blob();
-  const objUrl = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = objUrl;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(objUrl);
-}
-
-export default function ServicesTab({ vehicle }) {
+export default function ServicesTab({ vehicle, canEdit = true }) {
   const [services, setServices] = useState([]);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -45,6 +32,8 @@ export default function ServicesTab({ vehicle }) {
   const [useCustomType, setUseCustomType] = useState(false);
   const [files, setFiles] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState('');
+  const [pdfImages, setPdfImages] = useState(true);
 
   const load = () => apiFetch(`/vehicles/${vehicle.id}/services`).then(setServices).catch((e) => setError(e.message));
 
@@ -84,6 +73,20 @@ export default function ServicesTab({ vehicle }) {
     setShowForm(true);
   };
 
+  // Lädt ein PDF (ganzes Servicebuch oder einzelner Eintrag) und zeigt
+  // Fehler an, statt dass bei einem Problem einfach nichts passiert.
+  const exportPdf = async (key, path) => {
+    setPdfBusy(key);
+    setError('');
+    try {
+      await downloadFile(`${path}${pdfImages ? '' : '?images=false'}`, 'servicebuch.pdf');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setPdfBusy('');
+    }
+  };
+
   const closeForm = () => {
     setShowForm(false);
     setEditingId(null);
@@ -110,19 +113,33 @@ export default function ServicesTab({ vehicle }) {
         ? await apiFetch(`/vehicles/${vehicle.id}/services/${editingId}`, { method: 'PUT', body })
         : await apiFetch(`/vehicles/${vehicle.id}/services`, { method: 'POST', body });
 
+      // Der Eintrag selbst ist gespeichert; schlägt ein Datei-Upload fehl
+      // (zu groß, falscher Typ), wird das gemeldet statt es zu verschlucken.
+      const failed = [];
       for (const file of files) {
         const fd = new FormData();
         fd.append('file', file);
-        const token = getToken();
-        await fetch(`${API_URL}/vehicles/${vehicle.id}/services/${entry.id}/attachments`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-          body: fd,
-        });
+        try {
+          await apiFetch(`/vehicles/${vehicle.id}/services/${entry.id}/attachments`, {
+            method: 'POST',
+            body: fd,
+            isForm: true,
+          });
+        } catch (err) {
+          failed.push(`${file.name}: ${err.message}`);
+        }
       }
 
-      closeForm();
       load();
+      if (failed.length) {
+        setEditingId(entry.id);
+        setFiles([]);
+        setError(`Eintrag gespeichert, aber nicht alle Dateien konnten hochgeladen werden: ${failed.join(' | ')}`);
+        const refreshed = await apiFetch(`/vehicles/${vehicle.id}/services/${entry.id}`).catch(() => null);
+        setExistingAttachments(refreshed?.attachments || []);
+      } else {
+        closeForm();
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -132,32 +149,52 @@ export default function ServicesTab({ vehicle }) {
 
   const removeAttachment = async (attachmentId) => {
     if (!confirm('Diesen Anhang wirklich löschen?')) return;
-    await apiFetch(`/attachments/${attachmentId}`, { method: 'DELETE' });
-    setExistingAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
+    try {
+      await apiFetch(`/attachments/${attachmentId}`, { method: 'DELETE' });
+      setExistingAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
+      load();
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
   const remove = async (id) => {
     if (!confirm('Diesen Service-Eintrag wirklich löschen?')) return;
-    await apiFetch(`/vehicles/${vehicle.id}/services/${id}`, { method: 'DELETE' });
-    if (editingId === id) closeForm();
-    load();
+    try {
+      await apiFetch(`/vehicles/${vehicle.id}/services/${id}`, { method: 'DELETE' });
+      if (editingId === id) closeForm();
+      load();
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
-        <button onClick={() => (showForm ? closeForm() : openCreate())} className="btn-primary flex-1 lg:flex-none lg:px-8">
-          {showForm ? 'Abbrechen' : '+ Service-Eintrag'}
-        </button>
+      <div className="flex flex-wrap items-center gap-2">
+        {canEdit && (
+          <button onClick={() => (showForm ? closeForm() : openCreate())} className="btn-primary flex-1 lg:flex-none lg:px-8">
+            {showForm ? 'Abbrechen' : '+ Service-Eintrag'}
+          </button>
+        )}
         <button
-          onClick={() =>
-            downloadPdf(`${API_URL}/vehicles/${vehicle.id}/pdf`, `servicebuch-${vehicle.licensePlate}.pdf`)
-          }
-          className="btn-secondary"
+          onClick={() => exportPdf('all', `/vehicles/${vehicle.id}/pdf`)}
+          disabled={pdfBusy === 'all'}
+          className="btn-secondary inline-flex items-center gap-2"
         >
-          📄 PDF
+          <Icon name="document" className="h-5 w-5" />
+          {pdfBusy === 'all' ? 'Wird erstellt…' : 'Servicebuch als PDF'}
         </button>
+        <label className="flex items-center gap-1.5 text-xs text-gray-500">
+          <input type="checkbox" checked={pdfImages} onChange={(e) => setPdfImages(e.target.checked)} />
+          mit Fotos
+        </label>
       </div>
+      {!showForm && error && (
+        <p role="alert" className="text-sm text-red-600">
+          {error}
+        </p>
+      )}
 
       {showForm && (
         <form onSubmit={submit} className="card space-y-3 lg:max-w-2xl">
@@ -347,35 +384,44 @@ export default function ServicesTab({ vehicle }) {
           <div key={s.id} className="card">
             <div className="flex justify-between items-start">
               <div>
-                <p className="font-medium">
-                  {s.type} {s.important && <span className="text-red-600">⚠</span>}
+                <p className="flex flex-wrap items-center gap-2 font-medium">
+                  {s.type}
+                  {s.important && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800 ring-1 ring-amber-200">
+                      <Icon name="warning" className="h-3 w-3" />
+                      Wichtig
+                    </span>
+                  )}
                 </p>
                 <p className="text-xs text-gray-500">
-                  {new Date(s.date).toLocaleDateString('de-DE')} · {s.mileage.toLocaleString('de-DE')} km
+                  {fmtDate(s.date)} · {fmtKm(s.mileage)}
                   {s.workshop ? ` · ${s.workshop}` : ''}
                 </p>
               </div>
-              <p className="font-semibold text-sm">{Number(s.cost || 0).toFixed(2)} €</p>
+              <p className="shrink-0 pl-3 text-sm font-semibold">{fmtMoney(s.cost)}</p>
             </div>
             {s.notes && <p className="text-sm text-gray-600 mt-1">{s.notes}</p>}
             {s.attachments?.length > 0 && (
               <p className="text-xs text-gray-400 mt-1">{s.attachments.length} Anhang/Anhänge</p>
             )}
             <div className="flex gap-3 mt-2 text-xs">
-              <button onClick={() => openEdit(s)} className="text-brand-600">
-                Bearbeiten
-              </button>
+              {canEdit && (
+                <button onClick={() => openEdit(s)} className="text-brand-600">
+                  Bearbeiten
+                </button>
+              )}
               <button
-                onClick={() =>
-                  downloadPdf(`${API_URL}/vehicles/${vehicle.id}/services/${s.id}/pdf`, `service-${s.id.slice(0, 8)}.pdf`)
-                }
+                onClick={() => exportPdf(s.id, `/vehicles/${vehicle.id}/services/${s.id}/pdf`)}
+                disabled={pdfBusy === s.id}
                 className="text-brand-600"
               >
-                PDF exportieren
+                {pdfBusy === s.id ? 'Wird erstellt…' : 'PDF exportieren'}
               </button>
-              <button onClick={() => remove(s.id)} className="text-red-600">
-                Löschen
-              </button>
+              {canEdit && (
+                <button onClick={() => remove(s.id)} className="text-red-600">
+                  Löschen
+                </button>
+              )}
             </div>
           </div>
         ))}

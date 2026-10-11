@@ -7,12 +7,14 @@ if (!JWT_SECRET) {
   throw new Error('JWT_SECRET ist nicht gesetzt. Bitte .env prüfen (siehe .env.example).');
 }
 
+// Algorithmus explizit festlegen (und beim Prüfen erzwingen), damit nie ein
+// anderes Verfahren akzeptiert wird.
 function signToken(payload) {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN, algorithm: 'HS256' });
 }
 
 function verifyToken(token) {
-  return jwt.verify(token, JWT_SECRET);
+  return jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
 }
 
 module.exports = { signToken, verifyToken };

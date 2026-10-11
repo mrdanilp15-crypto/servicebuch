@@ -29,7 +29,7 @@ async function getDashboard(req, res, next) {
     });
 
     const now = new Date();
-    const currentYear = now.getFullYear();
+    const currentYear = now.getUTCFullYear();
 
     const costPerYear = {};
     const costPerYearByVehicle = {};
@@ -42,7 +42,7 @@ async function getDashboard(req, res, next) {
       costPerYearByVehicle[vehicle.id] = {};
 
       for (const entry of vehicle.serviceEntries) {
-        const year = new Date(entry.date).getFullYear();
+        const year = new Date(entry.date).getUTCFullYear();
         costPerYear[year] = (costPerYear[year] || 0) + (entry.cost || 0);
         costPerYearByVehicle[vehicle.id][year] = (costPerYearByVehicle[vehicle.id][year] || 0) + (entry.cost || 0);
       }

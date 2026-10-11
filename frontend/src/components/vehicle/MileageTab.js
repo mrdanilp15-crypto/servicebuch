@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react';
 import LineChart from '../LineChart';
-import { apiFetch, API_URL, getToken } from '../../lib/api';
+import Icon from '../Icon';
+import { apiFetch } from '../../lib/api';
+import { fmtDate, fmtKm } from '../../lib/format';
 
-export default function MileageTab({ vehicle }) {
+export default function MileageTab({ vehicle, canEdit = true }) {
   const [entries, setEntries] = useState([]);
   const [mileage, setMileage] = useState('');
   const [error, setError] = useState('');
@@ -45,13 +47,7 @@ export default function MileageTab({ vehicle }) {
       const fd = new FormData();
       fd.append('photo', file);
       fd.append('mileage', photoMileage);
-      const token = getToken();
-      const res = await fetch(`${API_URL}/vehicles/${vehicle.id}/mileage/photo`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: fd,
-      });
-      if (!res.ok) throw new Error('Upload fehlgeschlagen.');
+      await apiFetch(`/vehicles/${vehicle.id}/mileage/photo`, { method: 'POST', body: fd, isForm: true });
       setPhotoMileage('');
       load();
     } catch (err) {
@@ -64,16 +60,17 @@ export default function MileageTab({ vehicle }) {
   const points = entries.map((e) => ({
     x: new Date(e.date).getTime(),
     y: e.mileage,
-    label: new Date(e.date).toLocaleDateString('de-DE'),
+    label: fmtDate(e.date),
   }));
 
   return (
     <div className="space-y-4">
       <div className="card">
         <h2 className="font-semibold mb-2">Kilometerstand-Verlauf</h2>
-        <LineChart points={points} formatY={(y) => `${y.toLocaleString('de-DE')} km`} />
+        <LineChart points={points} formatY={(y) => fmtKm(y)} />
       </div>
 
+      {canEdit && (
       <div className="lg:grid lg:grid-cols-2 lg:gap-4 space-y-4 lg:space-y-0">
         <div className="card space-y-3">
           <h2 className="font-semibold">Manuelle Eingabe</h2>
@@ -102,7 +99,10 @@ export default function MileageTab({ vehicle }) {
             onChange={(e) => setPhotoMileage(e.target.value)}
           />
           <button onClick={() => fileRef.current?.click()} disabled={uploading} className="btn-secondary w-full">
-            {uploading ? 'Lädt…' : '📷 Foto aufnehmen / hochladen'}
+            <span className="inline-flex items-center justify-center gap-2">
+              <Icon name="camera" className="h-5 w-5" />
+              {uploading ? 'Lädt…' : 'Foto aufnehmen / hochladen'}
+            </span>
           </button>
           <input
             ref={fileRef}
@@ -114,6 +114,7 @@ export default function MileageTab({ vehicle }) {
           />
         </div>
       </div>
+      )}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
@@ -122,9 +123,10 @@ export default function MileageTab({ vehicle }) {
         <ul className="text-sm divide-y">
           {[...entries].reverse().map((e) => (
             <li key={e.id} className="flex justify-between py-1.5">
-              <span className="text-gray-500">{new Date(e.date).toLocaleDateString('de-DE')}</span>
-              <span className="font-medium">
-                {e.mileage.toLocaleString('de-DE')} km {e.source === 'PHOTO' ? '📷' : ''}
+              <span className="text-gray-500">{fmtDate(e.date)}</span>
+              <span className="inline-flex items-center gap-1.5 font-medium">
+                {e.source === 'PHOTO' && <Icon name="camera" className="h-4 w-4 text-gray-400" />}
+                {fmtKm(e.mileage)}
               </span>
             </li>
           ))}

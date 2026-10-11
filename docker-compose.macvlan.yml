@@ -24,21 +24,34 @@ version: '3.8'
 # Browser nur über HTTPS oder localhost - eine reine
 # http://<lan-ip>:3000-Adresse reicht dafür nicht aus.
 #
+# Registrierung: Der ERSTE Nutzer registriert sich selbst und wird Admin,
+# danach ist die Selbstregistrierung geschlossen - weitere Konten legt der
+# Admin unter "Benutzerverwaltung" an (oder REGISTRATION_OPEN auf 'true').
+# Rechtliches: LEGAL_OPERATOR_* unten füllen, wenn die App öffentlich
+# erreichbar ist (Impressum/Datenschutz, siehe README "Rechtliches").
+# Datensicherung: Volumes "servicebuch_data" UND "servicebuch_uploads"
+# immer zusammen sichern (die Schlüssel für die Uploads liegen in _data).
+#
 # Das Backend hängt bewusst NICHT im macvlan-Netzwerk - es wird nur intern
 # vom Frontend über den Docker-Servicenamen "backend" erreicht (siehe
 # next.config.js-Proxy) und muss daher nicht extra im LAN sichtbar sein.
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '3'
 
 services:
   backend:
     image: ghcr.io/mrdanilp15-crypto/servicebuch-backend:latest
     pull_policy: always
     restart: unless-stopped
+    logging: *default-logging
     environment:
       NODE_ENV: production
       PORT: 4000
-      # An die tatsächliche Domain anpassen, die NPM vor das Frontend
-      # schaltet (siehe unten) - nur für CORS relevant, nicht sicherheitskritisch.
-      FRONTEND_URL: https://servicebuch.example.com
+      TZ: Europe/Berlin
       DATABASE_URL: file:/app/data/dev.db
       DATA_DIR: /app/data
       UPLOAD_DIR: /app/uploads
@@ -46,6 +59,11 @@ services:
       VAPID_SUBJECT: mailto:admin@example.com
       TUEV_WARNING_DAYS: 30
       SERVICE_INTERVAL_KM_WARNING: 1000
+      REGISTRATION_OPEN: 'false'
+      LEGAL_OPERATOR_NAME: ''
+      LEGAL_OPERATOR_ADDRESS: ''
+      LEGAL_OPERATOR_EMAIL: ''
+      LEGAL_OPERATOR_PHONE: ''
     volumes:
       - servicebuch_data:/app/data
       - servicebuch_uploads:/app/uploads
@@ -60,6 +78,7 @@ services:
     image: ghcr.io/mrdanilp15-crypto/servicebuch-frontend:latest
     pull_policy: always
     restart: unless-stopped
+    logging: *default-logging
     environment:
       BACKEND_INTERNAL_URL: http://backend:4000
     depends_on:

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Header from '../../components/Header';
 import AuthImage from '../../components/AuthImage';
 import { apiFetch } from '../../lib/api';
+import { fmtKm } from '../../lib/format';
 
 export default function VehiclesPage() {
   const [vehicles, setVehicles] = useState([]);
@@ -75,7 +76,7 @@ export default function VehiclesPage() {
                   ))}
                 </div>
               </div>
-              <p className="text-sm text-gray-500 shrink-0">{v.currentMileage.toLocaleString('de-DE')} km</p>
+              <p className="text-sm text-gray-500 shrink-0">{fmtKm(v.currentMileage)}</p>
             </Link>
           ))}
         </div>

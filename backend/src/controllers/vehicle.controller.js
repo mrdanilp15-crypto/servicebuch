@@ -1,14 +1,24 @@
 const { z } = require('zod');
 const prisma = require('../lib/prisma');
 
+const { removeFiles } = require('../services/attachment.service');
+
+const currentYear = new Date().getFullYear();
+
 const vehicleSchema = z.object({
-  licensePlate: z.string().min(1),
-  make: z.string().min(1),
-  model: z.string().min(1),
-  year: z.coerce.number().int().optional().nullable(),
-  vin: z.string().optional().nullable(),
-  tags: z.array(z.string()).optional().default([]),
-  currentMileage: z.coerce.number().int().optional().default(0),
+  licensePlate: z.string().trim().min(1, 'Kennzeichen fehlt.').max(20).transform((v) => v.toUpperCase()),
+  make: z.string().trim().min(1, 'Hersteller fehlt.').max(60),
+  model: z.string().trim().min(1, 'Modell fehlt.').max(60),
+  year: z.preprocess(
+    (v) => (v === '' ? null : v),
+    z.coerce.number().int().min(1886).max(currentYear + 1).optional().nullable()
+  ),
+  vin: z.preprocess(
+    (v) => (typeof v === 'string' ? v.trim().toUpperCase() || null : v),
+    z.string().max(32).optional().nullable()
+  ),
+  tags: z.array(z.string().trim().min(1).max(30)).max(20).optional().default([]),
+  currentMileage: z.coerce.number().int().min(0).max(9_999_999).optional().default(0),
 });
 
 function serializeVehicle(vehicle) {
@@ -97,7 +107,13 @@ async function updateVehicle(req, res, next) {
 
 async function deleteVehicle(req, res, next) {
   try {
+    // Die Datenbankzeilen verschwinden per Cascade - die verschlüsselten
+    // Dateien (Rechnungen, Fotos) müssen explizit von der Platte gelöscht
+    // werden, sonst blieben Daten trotz "Fahrzeug gelöscht" zurück
+    // (Recht auf Löschung, Art. 17 DSGVO).
+    const attachments = await prisma.attachment.findMany({ where: { vehicleId: req.params.id } });
     await prisma.vehicle.delete({ where: { id: req.params.id } });
+    await removeFiles(attachments);
     res.status(204).end();
   } catch (err) {
     next(err);
@@ -109,9 +125,19 @@ const assignSchema = z.object({
   role: z.enum(['OWNER', 'EDITOR', 'VIEWER']).default('VIEWER'),
 });
 
+// Verhindert, dass ein Fahrzeug ohne Besitzer zurückbleibt (dann könnte es
+// niemand außer einem Admin mehr verwalten oder löschen).
+async function wouldRemoveLastOwner(vehicleId, userId) {
+  const owners = await prisma.vehicleAssignment.findMany({ where: { vehicleId, role: 'OWNER' } });
+  return owners.length === 1 && owners[0].userId === userId;
+}
+
 async function assignUser(req, res, next) {
   try {
     const data = assignSchema.parse(req.body);
+    if (data.role !== 'OWNER' && (await wouldRemoveLastOwner(req.params.id, data.userId))) {
+      return res.status(400).json({ error: 'Der letzte Besitzer eines Fahrzeugs kann nicht herabgestuft werden.' });
+    }
     const assignment = await prisma.vehicleAssignment.upsert({
       where: { userId_vehicleId: { userId: data.userId, vehicleId: req.params.id } },
       update: { role: data.role },
@@ -125,6 +151,9 @@ async function assignUser(req, res, next) {
 
 async function unassignUser(req, res, next) {
   try {
+    if (await wouldRemoveLastOwner(req.params.id, req.params.userId)) {
+      return res.status(400).json({ error: 'Der letzte Besitzer eines Fahrzeugs kann nicht entfernt werden.' });
+    }
     await prisma.vehicleAssignment.delete({
       where: { userId_vehicleId: { userId: req.params.userId, vehicleId: req.params.id } },
     });

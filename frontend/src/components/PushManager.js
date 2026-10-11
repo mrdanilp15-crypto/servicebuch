@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { apiFetch } from '../lib/api';
 
 function urlBase64ToUint8Array(base64String) {
@@ -81,7 +82,14 @@ export default function PushManager() {
     <div className="card flex items-center justify-between">
       <div>
         <p className="font-medium text-sm">Push-Benachrichtigungen</p>
-        <p className="text-xs text-gray-500">TÜV, Ölwechsel, Service & mehr</p>
+        <p className="text-xs text-gray-500">TÜV, Ölwechsel, Service &amp; mehr</p>
+        <p className="mt-0.5 text-xs text-gray-400">
+          Zustellung über den Push-Dienst deines Browsers (z. B. Google, Mozilla, Apple) –{' '}
+          <Link href="/datenschutz" className="underline">
+            mehr dazu
+          </Link>
+          .
+        </p>
         {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
       </div>
       <button

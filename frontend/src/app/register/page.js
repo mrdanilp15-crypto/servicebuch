@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../components/AuthProvider';
+import PublicShell, { BrandHeader } from '../../components/PublicShell';
+import { apiFetch } from '../../lib/api';
 
 export default function RegisterPage() {
   const { register } = useAuth();
@@ -13,6 +15,13 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(null); // null = wird geprüft
+
+  useEffect(() => {
+    apiFetch('/auth/status')
+      .then((s) => setOpen(!!s.registrationOpen))
+      .catch(() => setOpen(true)); // der Server entscheidet beim Absenden ohnehin
+  }, []);
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -28,22 +37,48 @@ export default function RegisterPage() {
     }
   };
 
-  return (
-    <div className="flex min-h-screen flex-col justify-center px-6 py-12">
-      <div className="mb-8 text-center">
-        <div className="text-4xl mb-2">🚗</div>
-        <h1 className="text-2xl font-bold">Konto erstellen</h1>
-        <p className="text-gray-500 text-sm mt-1">Der erste registrierte Nutzer wird automatisch Admin.</p>
-      </div>
+  if (open === false) {
+    return (
+      <PublicShell>
+        <BrandHeader title="Registrierung geschlossen" />
+        <div className="card space-y-3 text-sm text-gray-600 sm:p-6">
+          <p>
+            Auf dieser Instanz kann man sich nicht selbst registrieren. Neue Konten legt der Administrator unter
+            „Benutzerverwaltung“ an.
+          </p>
+          <Link href="/login" className="btn-primary block text-center">
+            Zur Anmeldung
+          </Link>
+        </div>
+      </PublicShell>
+    );
+  }
 
-      <form onSubmit={onSubmit} className="space-y-4 card">
+  return (
+    <PublicShell>
+      <BrandHeader title="Konto erstellen" subtitle="Der erste registrierte Nutzer wird automatisch Administrator." />
+
+      <form onSubmit={onSubmit} className="card space-y-4 sm:p-6">
         <div>
-          <label className="label">Name</label>
-          <input className="input" required value={name} onChange={(e) => setName(e.target.value)} />
+          <label className="label" htmlFor="name">
+            Name
+          </label>
+          <input
+            id="name"
+            className="input"
+            required
+            autoFocus
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            autoComplete="name"
+          />
         </div>
         <div>
-          <label className="label">E-Mail</label>
+          <label className="label" htmlFor="email">
+            E-Mail
+          </label>
           <input
+            id="email"
             className="input"
             type="email"
             required
@@ -53,21 +88,37 @@ export default function RegisterPage() {
           />
         </div>
         <div>
-          <label className="label">Passwort</label>
+          <label className="label" htmlFor="password">
+            Passwort
+          </label>
           <input
+            id="password"
             className="input"
             type="password"
             required
             minLength={8}
+            maxLength={128}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="new-password"
           />
+          <p className="mt-1 text-xs text-gray-400">Mindestens 8 Zeichen.</p>
         </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <button type="submit" disabled={loading} className="btn-primary w-full">
+        {error && (
+          <p role="alert" className="text-sm text-red-600">
+            {error}
+          </p>
+        )}
+        <button type="submit" disabled={loading || open === null} className="btn-primary w-full">
           {loading ? 'Wird erstellt…' : 'Registrieren'}
         </button>
+        <p className="text-xs text-gray-400">
+          Mit der Registrierung bestätigst du, die{' '}
+          <Link href="/datenschutz" className="underline" target="_blank">
+            Datenschutzhinweise
+          </Link>{' '}
+          gelesen zu haben.
+        </p>
       </form>
 
       <p className="mt-6 text-center text-sm text-gray-500">
@@ -76,6 +127,6 @@ export default function RegisterPage() {
           Anmelden
         </Link>
       </p>
-    </div>
+    </PublicShell>
   );
 }

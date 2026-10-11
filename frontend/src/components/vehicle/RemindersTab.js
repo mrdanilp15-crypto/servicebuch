@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { apiFetch } from '../../lib/api';
+import { fmtDate, fmtKm } from '../../lib/format';
 
 const TYPE_LABELS = {
   TUEV: 'TÜV / HU',
@@ -28,13 +29,18 @@ const emptyForm = {
   dueMileage: '',
 };
 
+// Monate auf ein Datum addieren (in UTC, damit die Zeitzone des Geräts keinen
+// Tag verschiebt). Endet der Zielmonat früher (31. Jan + 1 Monat), gilt der
+// letzte Tag des Zielmonats statt eines Datums im Folgemonat.
 function addMonths(date, months) {
   const d = new Date(date);
-  d.setMonth(d.getMonth() + months);
+  const day = d.getUTCDate();
+  d.setUTCMonth(d.getUTCMonth() + months);
+  if (d.getUTCDate() !== day) d.setUTCDate(0);
   return d.toISOString().slice(0, 10);
 }
 
-export default function RemindersTab({ vehicle }) {
+export default function RemindersTab({ vehicle, canEdit = true }) {
   const [rules, setRules] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [showForm, setShowForm] = useState(false);
@@ -91,23 +97,34 @@ export default function RemindersTab({ vehicle }) {
 
   const remove = async (id) => {
     if (!confirm('Erinnerung löschen?')) return;
-    await apiFetch(`/vehicles/${vehicle.id}/reminders/${id}`, { method: 'DELETE' });
-    load();
+    try {
+      await apiFetch(`/vehicles/${vehicle.id}/reminders/${id}`, { method: 'DELETE' });
+      load();
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
   const toggleActive = async (rule) => {
-    await apiFetch(`/vehicles/${vehicle.id}/reminders/${rule.id}`, {
-      method: 'PUT',
-      body: { active: !rule.active },
-    });
-    load();
+    try {
+      await apiFetch(`/vehicles/${vehicle.id}/reminders/${rule.id}`, {
+        method: 'PUT',
+        body: { active: !rule.active },
+      });
+      load();
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
   return (
     <div className="space-y-4">
-      <button onClick={() => setShowForm((s) => !s)} className="btn-primary w-full lg:w-auto lg:max-w-2xl">
-        {showForm ? 'Abbrechen' : '+ Erinnerung hinzufügen'}
-      </button>
+      {canEdit && (
+        <button onClick={() => setShowForm((s) => !s)} className="btn-primary w-full lg:w-auto lg:max-w-2xl">
+          {showForm ? 'Abbrechen' : '+ Erinnerung hinzufügen'}
+        </button>
+      )}
+      {!showForm && error && <p className="text-sm text-red-600">{error}</p>}
 
       {showForm && (
         <form onSubmit={submit} className="card space-y-3 lg:max-w-2xl">
@@ -179,7 +196,7 @@ export default function RemindersTab({ vehicle }) {
                   />
                 </div>
                 <p className="col-span-2 text-xs text-gray-400">
-                  Wird ab heute bzw. ab dem aktuellen Kilometerstand ({vehicle.currentMileage.toLocaleString('de-DE')} km)
+                  Wird ab heute bzw. ab dem aktuellen Kilometerstand ({fmtKm(vehicle.currentMileage)})
                   berechnet.
                 </p>
               </div>
@@ -222,25 +239,27 @@ export default function RemindersTab({ vehicle }) {
               <p className="font-medium">{r.label}</p>
               <p className="text-xs text-gray-500">
                 {TYPE_LABELS[r.type] || r.type}
-                {r.dueDate ? ` · fällig ${new Date(r.dueDate).toLocaleDateString('de-DE')}` : ''}
-                {r.dueMileage ? ` · ${r.dueMileage.toLocaleString('de-DE')} km` : ''}
+                {r.dueDate ? ` · fällig ${fmtDate(r.dueDate)}` : ''}
+                {r.dueMileage ? ` · ${fmtKm(r.dueMileage)}` : ''}
               </p>
               {(r.intervalMonths || r.intervalKm) && (
                 <p className="text-xs text-gray-400">
                   Intervall: {r.intervalMonths ? `alle ${r.intervalMonths} Monate` : ''}
                   {r.intervalMonths && r.intervalKm ? ' / ' : ''}
-                  {r.intervalKm ? `alle ${r.intervalKm.toLocaleString('de-DE')} km` : ''}
+                  {r.intervalKm ? `alle ${fmtKm(r.intervalKm)}` : ''}
                 </p>
               )}
             </div>
-            <div className="flex gap-3 text-xs shrink-0">
-              <button onClick={() => toggleActive(r)} className="text-brand-600">
-                {r.active ? 'Pausieren' : 'Aktivieren'}
-              </button>
-              <button onClick={() => remove(r.id)} className="text-red-600">
-                Löschen
-              </button>
-            </div>
+            {canEdit && (
+              <div className="flex gap-3 text-xs shrink-0">
+                <button onClick={() => toggleActive(r)} className="text-brand-600">
+                  {r.active ? 'Pausieren' : 'Aktivieren'}
+                </button>
+                <button onClick={() => remove(r.id)} className="text-red-600">
+                  Löschen
+                </button>
+              </div>
+            )}
           </div>
         ))}
         {rules.length === 0 && (

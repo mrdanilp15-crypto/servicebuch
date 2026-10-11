@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import AuthImage from '../AuthImage';
-import { apiFetch, API_URL, getToken } from '../../lib/api';
+import { apiFetch } from '../../lib/api';
 
-export default function GalleryTab({ vehicle }) {
+export default function GalleryTab({ vehicle, canEdit = true }) {
   const [images, setImages] = useState(vehicle.images || []);
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -26,13 +26,7 @@ export default function GalleryTab({ vehicle }) {
     try {
       const fd = new FormData();
       [...fileList].forEach((f) => fd.append('images', f));
-      const token = getToken();
-      const res = await fetch(`${API_URL}/vehicles/${vehicle.id}/uploads/gallery`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: fd,
-      });
-      if (!res.ok) throw new Error('Upload fehlgeschlagen.');
+      await apiFetch(`/vehicles/${vehicle.id}/uploads/gallery`, { method: 'POST', body: fd, isForm: true });
       load();
     } catch (err) {
       setError(err.message);
@@ -43,15 +37,21 @@ export default function GalleryTab({ vehicle }) {
 
   const remove = async (imageId) => {
     if (!confirm('Bild löschen?')) return;
-    await apiFetch(`/vehicles/${vehicle.id}/uploads/gallery/${imageId}`, { method: 'DELETE' });
-    load();
+    try {
+      await apiFetch(`/vehicles/${vehicle.id}/uploads/gallery/${imageId}`, { method: 'DELETE' });
+      load();
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
   return (
     <div className="space-y-4">
-      <button onClick={() => fileRef.current?.click()} disabled={uploading} className="btn-primary w-full lg:w-auto lg:max-w-xs">
-        {uploading ? 'Lädt…' : '+ Fotos hinzufügen'}
-      </button>
+      {canEdit && (
+        <button onClick={() => fileRef.current?.click()} disabled={uploading} className="btn-primary w-full lg:w-auto lg:max-w-xs">
+          {uploading ? 'Lädt…' : '+ Fotos hinzufügen'}
+        </button>
+      )}
       <input
         ref={fileRef}
         type="file"
@@ -66,12 +66,15 @@ export default function GalleryTab({ vehicle }) {
         {images.map((img) => (
           <div key={img.id} className="relative aspect-square">
             <AuthImage attachmentId={img.url} className="w-full h-full object-cover rounded-lg" />
-            <button
-              onClick={() => remove(img.id)}
-              className="absolute top-1 right-1 bg-black/60 text-white rounded-full w-5 h-5 text-xs leading-5"
-            >
-              ✕
-            </button>
+            {canEdit && (
+              <button
+                onClick={() => remove(img.id)}
+                className="absolute top-1 right-1 bg-black/60 text-white rounded-full w-5 h-5 text-xs leading-5"
+                aria-label="Bild löschen"
+              >
+                ✕
+              </button>
+            )}
           </div>
         ))}
       </div>

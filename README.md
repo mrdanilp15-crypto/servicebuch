@@ -10,7 +10,9 @@ In allen drei Fällen gilt dasselbe: keine `.env`-Datei, keine Secrets, keine
 Umgebungsvariablen. JWT-Signaturschlüssel, Verschlüsselungskey für Uploads und die
 Web-Push-Schlüssel werden vom Backend beim allerersten Start automatisch erzeugt und in einem
 Docker-Volume gespeichert, sodass sie bei jedem weiteren Start/Redeploy erhalten bleiben.
-Danach nur noch: registrieren (der erste Account wird automatisch Admin) und loslegen.
+Danach nur noch: registrieren und loslegen. Der **erste** Account wird automatisch Admin; danach ist die
+Selbstregistrierung geschlossen (die App ist oft per Domain im Internet erreichbar) – weitere Konten legt der
+Admin unter *Benutzerverwaltung* an (oder du setzt `REGISTRATION_OPEN=true`).
 
 ### Option A: Portainer (Server / NAS / Homelab)
 
@@ -185,7 +187,7 @@ Alle Routen unter `/api`, JWT im Header `Authorization: Bearer <token>`.
 
 | Bereich        | Routen (Auszug)                                                        |
 | -------------- | ------------------------------------------------------------------------ |
-| Auth           | `POST /auth/register`, `POST /auth/login`, `GET /auth/me`               |
+| Auth           | `GET /auth/status`, `POST /auth/register` (nur solange offen), `POST /auth/login`, `GET /auth/me`, `PUT /auth/password`, `GET /auth/export`, `DELETE /auth/me` |
 | Fahrzeuge      | `GET/POST /vehicles`, `GET/PUT/DELETE /vehicles/:id`, `POST /vehicles/:id/assign` |
 | Service        | `GET/POST /vehicles/:id/services`, `PUT/DELETE .../:serviceId`, `POST .../:serviceId/attachments` |
 | Kilometerstand | `GET/POST /vehicles/:id/mileage`, `POST /vehicles/:id/mileage/photo`    |
@@ -196,7 +198,8 @@ Alle Routen unter `/api`, JWT im Header `Authorization: Bearer <token>`.
 | Push           | `GET /push/public-key`, `POST /push/subscribe`, `POST /push/unsubscribe` |
 | Benachrichtigungen | `GET /notifications`, `POST /notifications/:id/read`, `POST /notifications/check` |
 | Dashboard      | `GET /dashboard`                                                        |
-| Benutzer       | `GET /users`, `PUT /users/:id/role` (Admin), `DELETE /users/:id` (Admin) |
+| Benutzer       | `GET /users` (Admin: alle, Fahrzeug-Besitzer: reduzierte Liste), `POST /users`, `PUT /users/:id/role`, `PUT /users/:id/password`, `DELETE /users/:id` (alle Admin) |
+| Rechtliches    | `GET /legal` (Betreiberangaben für Impressum/Datenschutz, öffentlich) |
 
 ## Rollen & Berechtigungen
 
@@ -204,16 +207,29 @@ Alle Routen unter `/api`, JWT im Header `Authorization: Bearer <token>`.
   Der erste registrierte Nutzer wird automatisch `ADMIN`.
 - **Fahrzeug-Rollen** (pro Zuweisung): `OWNER` (voller Zugriff inkl. Löschen/Zuweisen),
   `EDITOR` (Service-Einträge, km-Stand, Erinnerungen, Uploads verwalten), `VIEWER` (nur
-  Lesezugriff auf PDF-Export/Übersicht). Aus Einfachheitsgründen wird der Zugriff pro
-  Unterressource einheitlich geprüft (nicht pro HTTP-Methode) – für produktive Nutzung mit
-  vielen Viewer-Konten empfiehlt sich eine feingranularere Prüfung pro Route.
+  lesen: Übersicht, Service-Liste, Kilometerverlauf, Erinnerungen, Fotos, PDF-Export). Lesende
+  Zugriffe (`GET`) brauchen mindestens `VIEWER`, alles Schreibende mindestens `EDITOR`. Dateien
+  (`/attachments/:id`) sind an das Fahrzeug gebunden, zu dem sie gehören – wer keinen Zugriff
+  auf das Fahrzeug hat, bekommt auch die Datei nicht, selbst mit bekannter ID. Ein Fahrzeug
+  behält immer mindestens einen Besitzer, eine Instanz immer mindestens einen Admin.
 
 ## PDF-Erstellung
 
-- `GET /api/vehicles/:id/pdf` – komplettes Servicebuch, sortiert nach Datum, mit eingebetteten
-  Fotos aus den Service-Einträgen.
-- `GET /api/vehicles/:id/services/:serviceId/pdf` – einzelner Eintrag.
-- Query-Parameter `?images=false`, um Bilder aus Performance-Gründen auszulassen.
+- `GET /api/vehicles/:id/pdf` – das komplette Servicebuch: Kopf mit Fahrzeugbild und Kennzeichen,
+  Eckdaten (Baujahr, FIN, Kilometerstand, Anzahl Einträge, Gesamtkosten, Zeitraum), Plausibilitäts-
+  hinweis zu den Kilometerständen, Kosten pro Jahr als Balkendiagramm, anstehende Fälligkeiten
+  und die Service-Historie (Datum, km, Arbeiten, Werkstatt, Notizen, Kosten, Vorschaubilder).
+  Jede Seite hat eine Fußzeile mit Erstellzeitpunkt, Seitenzahl ("Seite x von y") und dem
+  Hinweis, dass es sich um Eigenangaben des Halters handelt (kein amtlicher/werkstattbestätigter
+  Nachweis).
+- `GET /api/vehicles/:id/services/:serviceId/pdf` – einzelner Eintrag als Service-Nachweis.
+- Query-Parameter `?images=false` lässt Fotos weg (in der App: Haken „mit Fotos").
+- Fotos werden für das PDF auf ein kompaktes JPEG umgerechnet (max. 1000 px) – ein Servicebuch
+  mit vielen Handyfotos bleibt dadurch klein; WebP/PNG/HEIC werden ebenfalls dargestellt.
+  PDF-Rechnungen werden als Anhang aufgelistet, nicht eingebettet.
+- Es werden die eingebauten PDF-Schriften verwendet (Umlaute, ß, €, Š usw. funktionieren;
+  Emojis/Sonderzeichen außerhalb des Windows-1252-Zeichensatzes werden durch ein Ersatzzeichen
+  ersetzt). Datumswerte sind in UTC-Kalendertagen, Zahlen/Beträge deutsch formatiert.
 
 ## Push-Benachrichtigungen
 
@@ -267,8 +283,64 @@ Start hinzufügen** (bzw. der Browser zeigt von selbst einen Installations-Hinwe
   nie ins Repository committet (siehe `.gitignore`). Bei einem Neustart mit leerem Volume
   werden neue Secrets erzeugt; bestehende JWT-Tokens werden dann ungültig und verschlüsselte
   Alt-Uploads lassen sich nicht mehr entschlüsseln – das Volume also nicht versehentlich löschen.
-- Rate-Limiting auf Auth-Routen und global über `express-rate-limit`, Security-Header über
-  `helmet`.
+- **Zugriffsschutz**: Jede Route prüft die Fahrzeugrolle (siehe „Rollen"); Einträge, Erinnerungen
+  und Dateien müssen zum Fahrzeug aus der URL gehören (kein „Fremde-ID-Raten"). Antworten auf
+  unberechtigte Dateizugriffe sind identisch mit „existiert nicht".
+- **Registrierung** ist nach dem ersten Konto geschlossen (`REGISTRATION_OPEN=true` öffnet sie).
+  Die Benutzerliste sehen nur Admins und Fahrzeug-Besitzer.
+- **Sitzungen**: JWT (HS256, 7 Tage). Passwortänderung/-reset macht alle bisherigen Tokens ungültig
+  (`tokenVersion`). E-Mail-Adressen werden kleingeschrieben gespeichert. Der Login prüft auch bei
+  unbekannter Adresse einen Hash (kein Timing-Rückschluss auf vorhandene Konten).
+- **Rate-Limiting** (`express-rate-limit`) auf Auth-Routen (20 Versuche / 15 min) und global, gezählt
+  **pro Client-IP**: `trust proxy` ist für private Adressbereiche gesetzt, damit hinter Nginx Proxy
+  Manager/Next.js-Proxy die echte IP aus `X-Forwarded-For` zählt – sonst würde ein Angreifer den
+  Login für alle sperren können.
+- **Header**: `helmet` im Backend; im Frontend CSP, `X-Frame-Options: DENY`, `nosniff`,
+  `Referrer-Policy`, `Permissions-Policy` (siehe `frontend/next.config.js`). HTTPS/HSTS stellt dein
+  Reverse Proxy bereit („Force SSL" in Nginx Proxy Manager).
+- **Uploads**: nur JPEG/PNG/WebP/HEIC/PDF, max. `MAX_UPLOAD_MB`. Bei Bildern werden **EXIF-Metadaten
+  (u. a. GPS-Standort)** beim Hochladen entfernt und die Bildgröße auf max. 2560 px begrenzt.
+- **Logs**: Das Backend-Zugriffslog enthält keine IP-Adressen und keine User-Agents; Docker-Logs sind in
+  den Compose-Dateien auf 3 × 10 MB begrenzt.
+- Das Backend ist im Standard-Compose nicht von außen erreichbar (kein `ports:`), nur über das Frontend.
+
+## Rechtliches (Deutschland / EU)
+
+> Das ist keine Rechtsberatung, sondern eine Übersicht, was die Software mitbringt und was du als
+> Betreiber selbst klären musst.
+
+**Was mitgeliefert wird**
+
+- **Impressum** (`/impressum`) und **Datenschutzerklärung** (`/datenschutz`) – ohne Login erreichbar,
+  verlinkt auf Login-/Registrierungsseite und in der Navigation. Die Datenschutzerklärung ist ein
+  Mustertext für die Standardfunktionen (verarbeitete Daten, Zwecke/Rechtsgrundlagen, keine Cookies,
+  lokale Speicherung, Push-Dienste Dritter, Speicherdauer, Betroffenenrechte).
+- **Betroffenenrechte in der App** unter *Mein Konto*: Auskunft/Datenübertragbarkeit (Art. 15, 20 DSGVO)
+  als JSON-Export, Berichtigung (Daten sind selbst editierbar), Löschung (Art. 17) inkl. aller nur von dir
+  genutzten Fahrzeuge **und der verschlüsselten Dateien auf der Platte**. Auch beim Löschen von
+  Fahrzeugen, Einträgen und Anhängen werden die Dateien wirklich entfernt.
+- **Datenminimierung**: keine Cookies, keine Tracker/Analytics, keine externen Schriftarten/CDNs/Karten,
+  EXIF/GPS aus Fotos entfernt, Log ohne IP.
+- Passwörter nur als Argon2id-Hash, Dateien AES-256-GCM-verschlüsselt (technische Maßnahmen, Art. 32 DSGVO).
+- Der PDF-Export weist darauf hin, dass es Eigenangaben des Halters sind.
+
+**Was du als Betreiber tun musst**
+
+1. **Anbieterangaben eintragen**, falls du die App öffentlich/geschäftsmäßig anbietest (§ 5 DDG):
+   `LEGAL_OPERATOR_NAME`, `LEGAL_OPERATOR_ADDRESS` (Zeilenumbruch als `\n`), `LEGAL_OPERATOR_EMAIL`,
+   `LEGAL_OPERATOR_PHONE` in der Compose-Datei setzen – sie erscheinen in Impressum und Datenschutz.
+   Bei rein privater Nutzung im Familien-/Freundeskreis ist in der Regel kein Impressum nötig
+   (Haushaltsausnahme, Art. 2 Abs. 2 lit. c DSGVO) – die Texte schaden trotzdem nicht.
+2. **Datenschutzerklärung prüfen/anpassen**, wenn du Hosting, Reverse Proxy oder Code änderst. Dein
+   Reverse Proxy (z. B. Nginx Proxy Manager) protokolliert evtl. IP-Adressen – das gehört dann in die
+   Erklärung (Speicherdauer/Rotation der Proxy-Logs beachten).
+3. **Nutzer informieren/einwilligen lassen**, wenn Fotos Dritte oder fremde Kennzeichen zeigen können.
+4. **Backups**: beide Volumes (`servicebuch_data` + `servicebuch_uploads`) zusammen sichern – ohne
+   `.secrets.json` aus `servicebuch_data` sind die Uploads nicht mehr lesbar. Backups fallen ebenfalls
+   unter Löschkonzept/Aufbewahrung.
+5. **HTTPS erzwingen** (Force SSL, ggf. HSTS) am Reverse Proxy.
+6. Bei Nutzung mit mehreren Personen: Auftragsverarbeitung/Zugriffskonzept klären – die Rolle
+   *Betrachter/Bearbeiter/Besitzer* pro Fahrzeug hilft, Zugriffe zu begrenzen.
 
 ## Performance
 
@@ -290,7 +362,7 @@ Start hinzufügen** (bzw. der Browser zeigt von selbst einen Installations-Hinwe
 ## Deployment in Produktion
 
 Alle drei Docker-Wege oben (Portainer, Docker Desktop, `docker compose up -d --build`) landen
-auf demselben Ergebnis: Backend auf Port 4000, Frontend auf Port 3000, SQLite-Datenbank,
+auf demselben Ergebnis: Frontend auf Port 3000 (das Backend ist nur intern erreichbar), SQLite-Datenbank,
 Uploads und die automatisch generierten Secrets liegen in benannten Docker-Volumes
 (`servicebuch_data`, `servicebuch_uploads`) und bleiben über Neustarts/Redeploys hinweg
 erhalten (`docker compose down` bzw. das Entfernen des Portainer-Stacks behält die Volumes,
@@ -299,8 +371,7 @@ alte Logins/verschlüsselte Uploads weg).
 
 Für eine öffentliche Domain zusätzlich einen Reverse Proxy (z. B. Nginx, Caddy, Traefik oder
 Portainers eigenes Ingress-Setup) mit TLS-Zertifikat vor beide Services schalten – Web Push
-benötigt HTTPS. `FRONTEND_URL` in `docker-compose.yml` auf die echte Domain anpassen (nur für
-CORS relevant). Die Backend-Adresse selbst muss **nicht** angepasst werden: das Frontend ruft
+benötigt HTTPS. Die Backend-Adresse selbst muss **nicht** angepasst werden: das Frontend ruft
 immer `/api/...` relativ zur eigenen Domain auf, der Next.js-Server proxied das serverseitig
 zum `backend`-Container (siehe `BACKEND_INTERNAL_URL`,
 `frontend/src/app/api/[...path]/route.js`) – das funktioniert unabhängig davon, unter welcher
@@ -329,7 +400,9 @@ Domain/IP die App erreichbar ist, ohne Rebuild.
 
 `npm run seed` (im `backend`-Verzeichnis) legt zwei Beispiel-Fahrzeuge mit Service-Historie,
 Kilometerstand-Verlauf und Erinnerungsregeln sowie einen Admin- und einen User-Account an
-(siehe oben für die Zugangsdaten).
+(siehe oben für die Zugangsdaten). Die Demo-Konten haben bekannte Passwörter – der Seed
+verweigert deshalb die Ausführung mit `NODE_ENV=production` (außer `ALLOW_DEMO_SEED=true`) und ist
+mehrfach ausführbar, ohne Beispielfahrzeuge zu verdoppeln.
 
 ## Lizenz
 

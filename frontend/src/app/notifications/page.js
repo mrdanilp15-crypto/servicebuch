@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Header from '../../components/Header';
 import { apiFetch } from '../../lib/api';
+import { fmtDateTime } from '../../lib/format';
 
 export default function NotificationsPage() {
   const [items, setItems] = useState([]);
@@ -20,20 +21,31 @@ export default function NotificationsPage() {
   }, []);
 
   const markRead = async (id) => {
-    await apiFetch(`/notifications/${id}/read`, { method: 'POST' });
-    load();
+    try {
+      await apiFetch(`/notifications/${id}/read`, { method: 'POST' });
+      load();
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
   const markAllRead = async () => {
-    await apiFetch('/notifications/read-all', { method: 'POST' });
-    load();
+    try {
+      await apiFetch('/notifications/read-all', { method: 'POST' });
+      load();
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
   const runCheck = async () => {
     setChecking(true);
+    setError('');
     try {
       await apiFetch('/notifications/check', { method: 'POST' });
       load();
+    } catch (err) {
+      setError(err.message);
     } finally {
       setChecking(false);
     }
@@ -61,7 +73,7 @@ export default function NotificationsPage() {
               <div>
                 <p className="font-medium text-sm">{n.title}</p>
                 <p className="text-sm text-gray-600">{n.body}</p>
-                <p className="text-xs text-gray-400 mt-1">{new Date(n.createdAt).toLocaleString('de-DE')}</p>
+                <p className="text-xs text-gray-400 mt-1">{fmtDateTime(n.createdAt)}</p>
               </div>
               {!n.read && (
                 <button onClick={() => markRead(n.id)} className="text-xs text-brand-600 shrink-0">
