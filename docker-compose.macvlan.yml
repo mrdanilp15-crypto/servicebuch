@@ -81,6 +81,8 @@ services:
     logging: *default-logging
     environment:
       BACKEND_INTERNAL_URL: http://backend:4000
+      # Auf allen Netzwerkschnittstellen lauschen (wichtig bei macvlan/mehreren Netzen).
+      HOSTNAME: 0.0.0.0
     depends_on:
       backend:
         condition: service_healthy

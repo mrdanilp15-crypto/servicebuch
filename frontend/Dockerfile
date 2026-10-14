@@ -19,4 +19,9 @@ COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
 
 EXPOSE 3000
-CMD ["node", "server.js"]
+# Next.js (standalone) bindet sich sonst an den Docker-Hostnamen und damit nur an
+# EINE Netzwerkschnittstelle des Containers. Hängt der Container an mehreren
+# Netzen (z.B. internes Compose-Netz + macvlan für Nginx Proxy Manager), hängt es
+# von der Reihenfolge der Netzwerk-Anbindung ab, welche - und der Proxy bekam dann
+# "Connection refused" (502). Explizit auf allen Schnittstellen lauschen.
+CMD ["sh", "-c", "HOSTNAME=0.0.0.0 exec node server.js"]
