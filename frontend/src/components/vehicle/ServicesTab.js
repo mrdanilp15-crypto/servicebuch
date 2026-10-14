@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { AttachmentList, ImageThumb, openAttachmentFile } from '../AttachmentViewer';
 import Icon from '../Icon';
+import { useAuth } from '../AuthProvider';
 import { apiFetch, downloadFile } from '../../lib/api';
 import { fmtDate, fmtKm, fmtMoney } from '../../lib/format';
 
@@ -20,6 +21,7 @@ const emptyForm = {
   recurring: false,
   recurringIntervalMonths: '',
   recurringIntervalKm: '',
+  notify: true,
 };
 
 export default function ServicesTab({ vehicle, canEdit = true, onVehicleChange }) {
@@ -32,6 +34,9 @@ export default function ServicesTab({ vehicle, canEdit = true, onVehicleChange }
   const [useCustomType, setUseCustomType] = useState(false);
   const [files, setFiles] = useState([]);
   const [saving, setSaving] = useState(false);
+  // Wie viele andere Personen (außer mir) Zugriff auf das Fahrzeug haben.
+  const { user } = useAuth();
+  const otherPeople = (vehicle.assignments || []).filter((a) => a.userId !== user?.id).length;
   const [pdfBusy, setPdfBusy] = useState('');
   const [pdfImages, setPdfImages] = useState(true);
 
@@ -333,6 +338,21 @@ export default function ServicesTab({ vehicle, canEdit = true, onVehicleChange }
               onChange={(e) => setFiles([...e.target.files])}
             />
           </div>
+
+          {!editingId && otherPeople > 0 && (
+            <label className="flex items-start gap-2 rounded-xl bg-brand-50 px-3 py-2 text-sm text-brand-700">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={form.notify}
+                onChange={(e) => setForm({ ...form, notify: e.target.checked })}
+              />
+              <span>
+                {otherPeople === 1 ? 'Die andere zugeordnete Person' : `Die ${otherPeople} anderen zugeordneten Personen`}{' '}
+                benachrichtigen („Hurra, Service erledigt!“)
+              </span>
+            </label>
+          )}
 
           <label className="flex items-center gap-2 text-sm">
             <input

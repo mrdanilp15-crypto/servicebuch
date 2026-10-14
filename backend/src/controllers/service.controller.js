@@ -3,6 +3,7 @@ const prisma = require('../lib/prisma');
 const { removeFiles } = require('../services/attachment.service');
 const { addMileageEntry, recomputeCurrentMileage } = require('../services/mileage.service');
 const { addMonths } = require('../utils/dates');
+const { notifyServiceDone } = require('../services/notify.service');
 
 const optionalInt = (max) =>
   z.preprocess((v) => (v === '' ? null : v), z.coerce.number().int().min(0).max(max).optional().nullable());
@@ -18,6 +19,8 @@ const serviceSchema = z.object({
   recurring: z.coerce.boolean().optional().default(false),
   recurringIntervalMonths: optionalInt(600),
   recurringIntervalKm: optionalInt(1_000_000),
+  // Nur beim Anlegen: andere Zugeordnete benachrichtigen (wird nicht gespeichert).
+  notify: z.boolean().optional(),
 });
 
 async function listServices(req, res, next) {
@@ -51,7 +54,7 @@ async function getService(req, res, next) {
 // automatisch eine ReminderRule fürs nächste Fälligkeitsdatum/-km.
 async function createService(req, res, next) {
   try {
-    const data = serviceSchema.parse(req.body);
+    const { notify = true, ...data } = serviceSchema.parse(req.body);
     const vehicleId = req.params.vehicleId;
 
     const service = await prisma.serviceEntry.create({
@@ -96,6 +99,8 @@ async function createService(req, res, next) {
       }
     }
 
+    if (notify) await notifyServiceDone({ vehicleId, service, actor: req.user });
+
     res.status(201).json(service);
   } catch (err) {
     next(err);
@@ -104,7 +109,7 @@ async function createService(req, res, next) {
 
 async function updateService(req, res, next) {
   try {
-    const data = serviceSchema.partial().parse(req.body);
+    const { notify, ...data } = serviceSchema.partial().parse(req.body);
     // Zusätzlich auf vehicleId filtern: ein Bearbeiter darf nur Einträge des
     // Fahrzeugs ändern, für das er berechtigt ist (nicht per ID fremde).
     const service = await prisma.serviceEntry.update({

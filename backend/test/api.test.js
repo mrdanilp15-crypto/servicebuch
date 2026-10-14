@@ -219,6 +219,21 @@ test('Rollen: Betrachter liest, Fremde sehen nichts, Dateien sind geschützt', a
   assert.equal((await api(`/vehicles/${ctx.vid}/services/${otherSvc.data.id}/pdf`, { token: ctx.viewer })).status, 404);
 });
 
+test('Service-Eintrag benachrichtigt die anderen Zugeordneten (abwählbar)', async () => {
+  const notes = async (token) => (await api('/notifications', { token })).data.filter((n) => n.type === 'SERVICE_DONE');
+  const base = (await notes(ctx.viewer)).length;
+  let r = await api(`/vehicles/${ctx.vid}/services`, { method: 'POST', token: ctx.admin, body: { date: today, mileage: 500, type: 'Ölwechsel', cost: 1 } });
+  assert.equal(r.status, 201);
+  const after = await notes(ctx.viewer);
+  assert.equal(after.length, base + 1);
+  assert.match(after[0].title, /Ölwechsel ist erledigt/);
+  assert.equal((await notes(ctx.admin)).length, 0, 'der Ersteller wird nicht selbst benachrichtigt');
+
+  r = await api(`/vehicles/${ctx.vid}/services`, { method: 'POST', token: ctx.admin, body: { date: today, mileage: 501, type: 'Reifen', cost: 1, notify: false } });
+  assert.equal(r.status, 201);
+  assert.equal((await notes(ctx.viewer)).length, base + 1, 'mit notify:false keine Meldung');
+});
+
 test('Letzter Admin/Besitzer ist geschützt', async () => {
   const me = (await api('/auth/me', { token: ctx.admin })).data.user;
   assert.equal((await api(`/users/${me.id}/role`, { method: 'PUT', token: ctx.admin, body: { role: 'USER' } })).status, 400);
