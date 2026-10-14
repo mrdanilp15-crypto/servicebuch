@@ -1,5 +1,7 @@
 const { z } = require('zod');
 const prisma = require('../lib/prisma');
+const { addMonths } = require('../utils/dates');
+const { startOfTodayUtc } = require('../services/mileage.service');
 
 const optionalInt = (max) =>
   z.preprocess((v) => (v === '' ? null : v), z.coerce.number().int().min(0).max(max).optional().nullable());
@@ -25,6 +27,8 @@ const reminderSchema = z.object({
   intervalMonths: optionalInt(600),
   intervalKm: optionalInt(1_000_000),
   active: z.coerce.boolean().optional().default(true),
+  // true: Fälligkeit serverseitig ab HEUTE bzw. ab dem AKTUELLEN Kilometerstand aus den Intervallen berechnen.
+  fromNow: z.boolean().optional(),
 });
 
 async function listReminders(req, res, next) {
@@ -41,7 +45,24 @@ async function listReminders(req, res, next) {
 
 async function createReminder(req, res, next) {
   try {
-    const data = reminderSchema.parse(req.body);
+    const { fromNow, ...data } = reminderSchema.parse(req.body);
+
+    // Intervall-Erinnerung: Bezugspunkt ist der Kilometerstand und das Datum,
+    // die der SERVER jetzt kennt - nicht ein evtl. veralteter Stand, der in der
+    // geöffneten Seite im Speicher liegt (z.B. wenn kurz vorher ein neuer
+    // Kilometerstand eingetragen wurde).
+    if (fromNow) {
+      const vehicle = await prisma.vehicle.findUnique({
+        where: { id: req.params.vehicleId },
+        select: { currentMileage: true },
+      });
+      data.dueDate = data.intervalMonths ? addMonths(startOfTodayUtc(), data.intervalMonths) : null;
+      data.dueMileage = data.intervalKm ? vehicle.currentMileage + data.intervalKm : null;
+    }
+    if (!data.dueDate && data.dueMileage == null) {
+      return res.status(400).json({ error: 'Bitte mindestens ein Fälligkeitskriterium angeben (Datum oder Kilometerstand).' });
+    }
+
     const rule = await prisma.reminderRule.create({
       data: { ...data, vehicleId: req.params.vehicleId },
     });

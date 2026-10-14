@@ -29,18 +29,34 @@ const emptyForm = {
   dueMileage: '',
 };
 
-// Monate auf ein Datum addieren (in UTC, damit die Zeitzone des Geräts keinen
-// Tag verschiebt). Endet der Zielmonat früher (31. Jan + 1 Monat), gilt der
-// letzte Tag des Zielmonats statt eines Datums im Folgemonat.
-function addMonths(date, months) {
-  const d = new Date(date);
-  const day = d.getUTCDate();
-  d.setUTCMonth(d.getUTCMonth() + months);
-  if (d.getUTCDate() !== day) d.setUTCDate(0);
-  return d.toISOString().slice(0, 10);
+// Zeigt, wie weit die Fälligkeit noch entfernt (oder überschritten) ist - bezogen
+// auf den aktuellen Kilometerstand des Fahrzeugs.
+function ReminderStatus({ rule, currentMileage }) {
+  const parts = [];
+  let overdue = false;
+  if (rule.dueMileage != null) {
+    const left = rule.dueMileage - currentMileage;
+    if (left <= 0) {
+      overdue = true;
+      parts.push(`${fmtKm(-left)} überschritten`);
+    } else {
+      parts.push(`noch ${fmtKm(left)}`);
+    }
+  }
+  if (rule.dueDate) {
+    const days = Math.ceil((new Date(rule.dueDate).getTime() - Date.now()) / 86400000);
+    if (days < 0) {
+      overdue = true;
+      parts.push(`${-days} Tage überfällig`);
+    } else {
+      parts.push(days === 0 ? 'heute fällig' : `noch ${days} Tage`);
+    }
+  }
+  if (!parts.length) return null;
+  return <p className={`text-xs font-medium ${overdue ? 'text-red-600' : 'text-green-700'}`}>{parts.join(' · ')}</p>;
 }
 
-export default function RemindersTab({ vehicle, canEdit = true }) {
+export default function RemindersTab({ vehicle, canEdit = true, onVehicleChange }) {
   const [rules, setRules] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [showForm, setShowForm] = useState(false);
@@ -53,6 +69,7 @@ export default function RemindersTab({ vehicle, canEdit = true }) {
 
   useEffect(() => {
     load();
+    onVehicleChange?.(); // aktuellen Kilometerstand frisch holen
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicle.id]);
 
@@ -60,17 +77,11 @@ export default function RemindersTab({ vehicle, canEdit = true }) {
     e.preventDefault();
     setError('');
 
-    let dueDate = form.dueDate || null;
-    let dueMileage = form.dueMileage ? Number(form.dueMileage) : null;
     const intervalMonths = form.intervalMonths ? Number(form.intervalMonths) : null;
     const intervalKm = form.intervalKm ? Number(form.intervalKm) : null;
+    const interval = form.mode === 'interval';
 
-    if (form.mode === 'interval') {
-      dueDate = intervalMonths ? addMonths(new Date(), intervalMonths) : null;
-      dueMileage = intervalKm ? vehicle.currentMileage + intervalKm : null;
-    }
-
-    if (!dueDate && !dueMileage) {
+    if (interval ? !intervalMonths && !intervalKm : !form.dueDate && !form.dueMileage) {
       setError('Bitte mindestens ein Fälligkeitskriterium angeben (Intervall oder festes Datum/km).');
       return;
     }
@@ -81,10 +92,11 @@ export default function RemindersTab({ vehicle, canEdit = true }) {
         body: {
           type: form.type,
           label: form.label || TYPE_LABELS[form.type],
-          dueDate,
-          dueMileage,
-          intervalMonths: form.mode === 'interval' ? intervalMonths : null,
-          intervalKm: form.mode === 'interval' ? intervalKm : null,
+          // Intervall: Der Server rechnet ab heute bzw. ab dem AKTUELLEN
+          // Kilometerstand (nicht ab einem evtl. veralteten Wert dieser Seite).
+          ...(interval
+            ? { fromNow: true, intervalMonths, intervalKm }
+            : { dueDate: form.dueDate || null, dueMileage: form.dueMileage ? Number(form.dueMileage) : null }),
         },
       });
       setForm(emptyForm);
@@ -242,6 +254,7 @@ export default function RemindersTab({ vehicle, canEdit = true }) {
                 {r.dueDate ? ` · fällig ${fmtDate(r.dueDate)}` : ''}
                 {r.dueMileage ? ` · ${fmtKm(r.dueMileage)}` : ''}
               </p>
+              {r.active && <ReminderStatus rule={r} currentMileage={vehicle.currentMileage} />}
               {(r.intervalMonths || r.intervalKm) && (
                 <p className="text-xs text-gray-400">
                   Intervall: {r.intervalMonths ? `alle ${r.intervalMonths} Monate` : ''}

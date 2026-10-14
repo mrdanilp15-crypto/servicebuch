@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import AuthImage from '../AuthImage';
+import { AttachmentList, ImageThumb, openAttachmentFile } from '../AttachmentViewer';
 import Icon from '../Icon';
 import { apiFetch, downloadFile } from '../../lib/api';
 import { fmtDate, fmtKm, fmtMoney } from '../../lib/format';
@@ -22,7 +22,7 @@ const emptyForm = {
   recurringIntervalKm: '',
 };
 
-export default function ServicesTab({ vehicle, canEdit = true }) {
+export default function ServicesTab({ vehicle, canEdit = true, onVehicleChange }) {
   const [services, setServices] = useState([]);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -35,7 +35,12 @@ export default function ServicesTab({ vehicle, canEdit = true }) {
   const [pdfBusy, setPdfBusy] = useState('');
   const [pdfImages, setPdfImages] = useState(true);
 
-  const load = () => apiFetch(`/vehicles/${vehicle.id}/services`).then(setServices).catch((e) => setError(e.message));
+  const load = () =>
+    apiFetch(`/vehicles/${vehicle.id}/services`)
+      .then(setServices)
+      .catch((e) => setError(e.message))
+      // Service-Einträge können den Kilometerstand des Fahrzeugs ändern.
+      .finally(() => onVehicleChange?.());
 
   useEffect(() => {
     load();
@@ -216,6 +221,8 @@ export default function ServicesTab({ vehicle, canEdit = true }) {
                 className="input"
                 type="number"
                 autoComplete="off"
+                inputMode="numeric"
+                placeholder={`aktuell ${vehicle.currentMileage}`}
                 required
                 value={form.mileage}
                 onChange={(e) => setForm({ ...form, mileage: e.target.value })}
@@ -292,11 +299,15 @@ export default function ServicesTab({ vehicle, canEdit = true }) {
                 {existingAttachments.map((a) => (
                   <div key={a.id} className="relative aspect-square">
                     {a.mimeType?.startsWith('image/') ? (
-                      <AuthImage attachmentId={a.id} className="w-full h-full object-cover rounded-lg" />
+                      <ImageThumb attachmentId={a.id} name={a.originalName} className="h-full w-full" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center rounded-lg bg-gray-100 text-xs text-gray-500 text-center p-1">
+                      <button
+                        type="button"
+                        onClick={() => openAttachmentFile(a.id)}
+                        className="flex h-full w-full items-center justify-center rounded-lg bg-gray-100 p-1 text-center text-xs text-gray-600 hover:bg-gray-200"
+                      >
                         {a.originalName || 'Datei'}
-                      </div>
+                      </button>
                     )}
                     <button
                       type="button"
@@ -401,9 +412,7 @@ export default function ServicesTab({ vehicle, canEdit = true }) {
               <p className="shrink-0 pl-3 text-sm font-semibold">{fmtMoney(s.cost)}</p>
             </div>
             {s.notes && <p className="text-sm text-gray-600 mt-1">{s.notes}</p>}
-            {s.attachments?.length > 0 && (
-              <p className="text-xs text-gray-400 mt-1">{s.attachments.length} Anhang/Anhänge</p>
-            )}
+            <AttachmentList attachments={s.attachments} />
             <div className="flex gap-3 mt-2 text-xs">
               {canEdit && (
                 <button onClick={() => openEdit(s)} className="text-brand-600">

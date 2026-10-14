@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Header from '../../../components/Header';
 import OverviewTab from '../../../components/vehicle/OverviewTab';
@@ -32,6 +32,16 @@ export default function VehicleDetailPage() {
       .then(setVehicle)
       .catch((e) => setError(e.message));
   }, [id]);
+
+  // Lädt das Fahrzeug neu - nötig, sobald sich der Kilometerstand geändert hat
+  // (Eintrag, Service, Korrektur), damit alle Tabs den aktuellen Wert kennen.
+  const refreshVehicle = useCallback(
+    () =>
+      apiFetch(`/vehicles/${id}`)
+        .then(setVehicle)
+        .catch(() => {}),
+    [id]
+  );
 
   const deleteVehicle = async () => {
     if (!confirm('Dieses Fahrzeug inkl. aller Einträge, Fotos und Rechnungen unwiderruflich löschen?')) return;
@@ -86,10 +96,10 @@ export default function VehicleDetailPage() {
         )}
 
         {tab === 'overview' && <OverviewTab vehicle={vehicle} onChange={setVehicle} canEdit={canEdit} isOwner={isOwner} />}
-        {tab === 'services' && <ServicesTab vehicle={vehicle} canEdit={canEdit} />}
-        {tab === 'mileage' && <MileageTab vehicle={vehicle} canEdit={canEdit} />}
+        {tab === 'services' && <ServicesTab vehicle={vehicle} canEdit={canEdit} onVehicleChange={refreshVehicle} />}
+        {tab === 'mileage' && <MileageTab vehicle={vehicle} canEdit={canEdit} onVehicleChange={refreshVehicle} />}
         {tab === 'gallery' && <GalleryTab vehicle={vehicle} canEdit={canEdit} />}
-        {tab === 'reminders' && <RemindersTab vehicle={vehicle} canEdit={canEdit} />}
+        {tab === 'reminders' && <RemindersTab vehicle={vehicle} canEdit={canEdit} onVehicleChange={refreshVehicle} />}
 
         {tab === 'overview' && isOwner && (
           <>

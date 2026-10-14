@@ -25,7 +25,7 @@ async function exportVehiclePdf(req, res, next) {
       where: { id: req.params.vehicleId },
       include: {
         serviceEntries: { orderBy: { date: 'desc' }, include: { attachments: { orderBy: { createdAt: 'asc' } } } },
-        mileageEntries: { select: { date: true, mileage: true } },
+        mileageEntries: { select: { date: true, mileage: true, source: true } },
         reminderRules: { where: { active: true } },
       },
     });

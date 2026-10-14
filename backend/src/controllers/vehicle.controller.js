@@ -2,6 +2,7 @@ const { z } = require('zod');
 const prisma = require('../lib/prisma');
 
 const { removeFiles } = require('../services/attachment.service');
+const { addMileageEntry, startOfTodayUtc } = require('../services/mileage.service');
 
 const currentYear = new Date().getFullYear();
 
@@ -81,6 +82,14 @@ async function createVehicle(req, res, next) {
         tags: data.tags.join(','),
         currentMileage: data.currentMileage,
         assignments: { create: { userId: req.user.id, role: 'OWNER' } },
+        // Der Startwert ist der erste Punkt im Kilometer-Verlauf. Er ist oft nur
+        // geschätzt und lässt sich später durch einen genaueren Eintrag
+        // überschreiben (der zuletzt datierte Stand gilt) oder löschen.
+        ...(data.currentMileage > 0 && {
+          mileageEntries: {
+            create: { mileage: data.currentMileage, date: startOfTodayUtc(), source: 'INITIAL' },
+          },
+        }),
       },
     });
     res.status(201).json(serializeVehicle(vehicle));
@@ -95,10 +104,18 @@ async function updateVehicle(req, res, next) {
     const payload = { ...data };
     if (data.tags) payload.tags = data.tags.join(',');
 
-    const vehicle = await prisma.vehicle.update({
-      where: { id: req.params.id },
-      data: payload,
-    });
+    // Kilometerstand wird nicht direkt überschrieben, sondern als neuer Eintrag
+    // im Verlauf erfasst (dadurch bleibt die Historie stimmig und der Stand
+    // auch bei Folge-Einträgen konsistent).
+    const newMileage = payload.currentMileage;
+    delete payload.currentMileage;
+    const before = await prisma.vehicle.findUnique({ where: { id: req.params.id }, select: { currentMileage: true } });
+
+    let vehicle = await prisma.vehicle.update({ where: { id: req.params.id }, data: payload });
+    if (newMileage != null && before && newMileage !== before.currentMileage) {
+      await addMileageEntry({ vehicleId: vehicle.id, mileage: newMileage, source: 'MANUAL' });
+      vehicle = await prisma.vehicle.findUnique({ where: { id: vehicle.id } });
+    }
     res.json(serializeVehicle(vehicle));
   } catch (err) {
     next(err);

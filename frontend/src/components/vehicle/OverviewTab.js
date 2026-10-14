@@ -19,6 +19,7 @@ export default function OverviewTab({ vehicle, onChange, canEdit = true, isOwner
     model: vehicle.model,
     year: vehicle.year || '',
     vin: vehicle.vin || '',
+    currentMileage: vehicle.currentMileage,
     tags: vehicle.tags,
   });
 
@@ -42,7 +43,11 @@ export default function OverviewTab({ vehicle, onChange, canEdit = true, isOwner
     try {
       const updated = await apiFetch(`/vehicles/${vehicle.id}`, {
         method: 'PUT',
-        body: { ...form, year: form.year ? Number(form.year) : null },
+        body: {
+          ...form,
+          year: form.year ? Number(form.year) : null,
+          currentMileage: form.currentMileage === '' ? undefined : Number(form.currentMileage),
+        },
       });
       onChange({ ...vehicle, ...updated });
       setEditing(false);
@@ -128,6 +133,17 @@ export default function OverviewTab({ vehicle, onChange, canEdit = true, isOwner
             <Field label="Modell" value={form.model} onChange={(v) => setForm({ ...form, model: v })} />
             <Field label="Baujahr" value={form.year} onChange={(v) => setForm({ ...form, year: v })} type="number" />
             <Field label="FIN / VIN" value={form.vin} onChange={(v) => setForm({ ...form, vin: v })} />
+            <div>
+              <Field
+                label="Aktueller Kilometerstand"
+                type="number"
+                value={form.currentMileage}
+                onChange={(v) => setForm({ ...form, currentMileage: v })}
+              />
+              <p className="mt-1 text-xs text-gray-400">
+                Eine Änderung wird als neuer Eintrag im Kilometer-Verlauf gespeichert.
+              </p>
+            </div>
             <div>
               <label className="label">Tags</label>
               <TagInput value={form.tags} onChange={(tags) => setForm({ ...form, tags })} />

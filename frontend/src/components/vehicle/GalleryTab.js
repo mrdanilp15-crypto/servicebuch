@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import AuthImage from '../AuthImage';
+import { ImageThumb } from '../AttachmentViewer';
 import { apiFetch } from '../../lib/api';
 
 export default function GalleryTab({ vehicle, canEdit = true }) {
@@ -65,7 +65,7 @@ export default function GalleryTab({ vehicle, canEdit = true }) {
       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
         {images.map((img) => (
           <div key={img.id} className="relative aspect-square">
-            <AuthImage attachmentId={img.url} className="w-full h-full object-cover rounded-lg" />
+            <ImageThumb attachmentId={img.url} name={img.caption || 'Fahrzeugfoto'} className="h-full w-full" />
             {canEdit && (
               <button
                 onClick={() => remove(img.id)}

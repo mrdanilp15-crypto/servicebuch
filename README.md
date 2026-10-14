@@ -127,7 +127,13 @@ als Tag veröffentlicht, falls du eine bestimmte Version statt `:latest` fixiere
 - **PDF-Export**: komplettes Servicebuch oder einzelner Eintrag, inklusive eingebetteter Fotos.
 - **Push-Benachrichtigungen**: TÜV fällig, Ölwechsel fällig, Service-Intervall erreicht,
   km-Stand über Intervall, Reifenwechsel – täglicher Cron-Check plus manueller Trigger im UI.
-- **Kilometerstand-Tracking**: manuelle Eingabe, Foto vom Tacho, Verlaufskurve.
+- **Kilometerstand-Tracking**: manuelle Eingabe (mit Datum), Foto vom Tacho (als Beleg im Verlauf
+  ansehbar), Verlaufskurve, Einträge ändern/löschen. Der **aktuelle Stand ist der Stand des zuletzt
+  datierten Eintrags** (nicht der Höchstwert): Ein beim Anlegen geschätzter Stand (z. B. 200.000 km)
+  wird durch den später eingetragenen genauen Wert (199.380 km) ersetzt. Ein nachträglich
+  eingetragener älterer Service ändert den aktuellen Stand nicht. Jeder Service-Eintrag ist
+  zugleich ein Messpunkt im Verlauf (wird beim Ändern/Löschen mitgezogen). Intervall-Erinnerungen
+  rechnen serverseitig ab dem aktuellen Stand.
 - **Dashboard**: alle Fahrzeuge, fällige Services, Kosten pro Jahr, Kilometerentwicklung, Warnungen.
 - **Benutzerverwaltung**: Login/Registrierung, Rollen (Admin/User), Fahrzeuge pro Nutzer mit
   Owner/Editor/Viewer-Rolle zuweisen.
@@ -190,7 +196,7 @@ Alle Routen unter `/api`, JWT im Header `Authorization: Bearer <token>`.
 | Auth           | `GET /auth/status`, `POST /auth/register` (nur solange offen), `POST /auth/login`, `GET /auth/me`, `PUT /auth/password`, `GET /auth/export`, `DELETE /auth/me` |
 | Fahrzeuge      | `GET/POST /vehicles`, `GET/PUT/DELETE /vehicles/:id`, `POST /vehicles/:id/assign` |
 | Service        | `GET/POST /vehicles/:id/services`, `PUT/DELETE .../:serviceId`, `POST .../:serviceId/attachments` |
-| Kilometerstand | `GET/POST /vehicles/:id/mileage`, `POST /vehicles/:id/mileage/photo`    |
+| Kilometerstand | `GET/POST /vehicles/:id/mileage`, `PUT/DELETE .../:entryId`, `POST /vehicles/:id/mileage/photo` |
 | Erinnerungen   | `GET/POST /vehicles/:id/reminders`, `PUT/DELETE .../:ruleId`             |
 | PDF            | `GET /vehicles/:id/pdf`, `GET /vehicles/:id/services/:serviceId/pdf`    |
 | Uploads        | `POST /vehicles/:id/uploads/header`, `POST /vehicles/:id/uploads/gallery` |
@@ -395,6 +401,14 @@ Domain/IP die App erreichbar ist, ohne Rebuild.
    Storage bei PaaS-Anbietern ohne Volume-Unterstützung).
 4. **Reverse Proxy / HTTPS**: für Produktion zwingend erforderlich (Web Push, sichere Cookies
    falls später ergänzt).
+
+## Tests
+
+`cd backend && npm test` startet ein echtes Backend mit frischer temporärer Datenbank und prüft die
+Kernfunktionen Ende-zu-Ende (Konten/Registrierung, Rollen und Zugriffsschutz, Kilometerstand-Logik,
+Service-Einträge, Erinnerungen, Tacho-Foto/EXIF, PDF, Datenexport, Löschung inkl. Dateien,
+Rate-Limit pro IP). Die GitHub-Action führt sie vor jedem Image-Build aus – bei einem Fehler wird
+nichts veröffentlicht.
 
 ## Beispieldaten
 

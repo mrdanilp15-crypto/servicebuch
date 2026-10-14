@@ -1,6 +1,8 @@
 const { z } = require('zod');
 const prisma = require('../lib/prisma');
 const { removeFiles } = require('../services/attachment.service');
+const { addMileageEntry, recomputeCurrentMileage } = require('../services/mileage.service');
+const { addMonths } = require('../utils/dates');
 
 const optionalInt = (max) =>
   z.preprocess((v) => (v === '' ? null : v), z.coerce.number().int().min(0).max(max).optional().nullable());
@@ -44,15 +46,6 @@ async function getService(req, res, next) {
   }
 }
 
-function addMonths(date, months) {
-  const d = new Date(date);
-  const day = d.getUTCDate();
-  d.setUTCMonth(d.getUTCMonth() + months);
-  // 31. Januar + 1 Monat darf nicht im März landen, sondern am 28./29. Februar.
-  if (d.getUTCDate() !== day) d.setUTCDate(0);
-  return d;
-}
-
 // Legt einen Service-Eintrag an. Aktualisiert den Fahrzeug-Kilometerstand,
 // wenn der Eintrag einen höheren Stand meldet, und erzeugt bei "recurring"
 // automatisch eine ReminderRule fürs nächste Fälligkeitsdatum/-km.
@@ -65,16 +58,16 @@ async function createService(req, res, next) {
       data: { ...data, vehicleId },
     });
 
-    const vehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
-    if (data.mileage > vehicle.currentMileage) {
-      await prisma.vehicle.update({
-        where: { id: vehicleId },
-        data: { currentMileage: data.mileage },
-      });
-      await prisma.mileageEntry.create({
-        data: { vehicleId, mileage: data.mileage, date: data.date, source: 'SERVICE_ENTRY' },
-      });
-    }
+    // Jeder Service-Eintrag ist zugleich ein Kilometerstand-Messpunkt (mit dem
+    // Eintrag verknüpft). Ob er den aktuellen Stand ändert, entscheidet das
+    // Datum: nur der zuletzt datierte Eintrag zählt als aktueller Stand.
+    await addMileageEntry({
+      vehicleId,
+      mileage: data.mileage,
+      date: data.date,
+      source: 'SERVICE_ENTRY',
+      serviceEntryId: service.id,
+    });
 
     if (data.recurring && (data.recurringIntervalMonths || data.recurringIntervalKm)) {
       const dueDate = data.recurringIntervalMonths ? addMonths(data.date, data.recurringIntervalMonths) : null;
@@ -118,6 +111,30 @@ async function updateService(req, res, next) {
       where: { id: req.params.id, vehicleId: req.params.vehicleId },
       data,
     });
+
+    // Datum/Kilometerstand geändert (z.B. Tippfehler korrigiert): verknüpften
+    // Verlaufs-Eintrag mitziehen. Ältere Service-Einträge ohne Verknüpfung
+    // bekommen dabei nachträglich einen.
+    if (data.mileage != null || data.date != null) {
+      const linked = await prisma.mileageEntry.findFirst({ where: { serviceEntryId: service.id } });
+      if (linked) {
+        await prisma.mileageEntry.update({
+          where: { id: linked.id },
+          data: { mileage: service.mileage, date: service.date },
+        });
+      } else {
+        await prisma.mileageEntry.create({
+          data: {
+            vehicleId: service.vehicleId,
+            mileage: service.mileage,
+            date: service.date,
+            source: 'SERVICE_ENTRY',
+            serviceEntryId: service.id,
+          },
+        });
+      }
+      await recomputeCurrentMileage(service.vehicleId);
+    }
     res.json(service);
   } catch (err) {
     next(err);
@@ -131,6 +148,8 @@ async function deleteService(req, res, next) {
     });
     await prisma.serviceEntry.delete({ where: { id: req.params.id, vehicleId: req.params.vehicleId } });
     await removeFiles(attachments);
+    // Der verknüpfte Verlaufs-Eintrag verschwindet per Cascade mit - Stand neu berechnen.
+    await recomputeCurrentMileage(req.params.vehicleId);
     res.status(204).end();
   } catch (err) {
     next(err);

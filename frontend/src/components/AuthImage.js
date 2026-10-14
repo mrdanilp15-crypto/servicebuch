@@ -13,7 +13,7 @@ import Icon from './Icon';
 // einzigen Request teilen statt doppelt zu laden.
 const urlCache = new Map();
 
-function loadAttachment(attachmentId) {
+export function loadAttachment(attachmentId) {
   if (!urlCache.has(attachmentId)) {
     urlCache.set(
       attachmentId,

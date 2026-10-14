@@ -359,7 +359,9 @@ function costsByYear(entries) {
 function mileagePlausibility(services, mileageEntries) {
   const points = [
     ...services.map((s) => ({ date: new Date(s.date), km: s.mileage })),
-    ...mileageEntries.map((m) => ({ date: new Date(m.date), km: m.mileage })),
+    // Der beim Anlegen erfasste Startwert ist oft nur geschätzt - er soll keinen
+    // "Kilometerstand sinkt"-Hinweis auslösen, wenn später der genaue Stand eingetragen wird.
+    ...mileageEntries.filter((m) => m.source !== 'INITIAL').map((m) => ({ date: new Date(m.date), km: m.mileage })),
   ].sort((a, b) => a.date - b.date || a.km - b.km);
   if (points.length < 2) return null;
   let max = points[0];

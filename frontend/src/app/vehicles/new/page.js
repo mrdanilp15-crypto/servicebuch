@@ -97,13 +97,18 @@ export default function NewVehiclePage() {
               />
             </div>
             <div>
-              <label className="label">Kilometerstand</label>
+              <label className="label">Kilometerstand (ca.)</label>
               <input
                 className="input"
                 type="number"
+                inputMode="numeric"
+                autoComplete="off"
                 value={form.currentMileage}
                 onChange={(e) => setForm({ ...form, currentMileage: e.target.value })}
               />
+              <p className="mt-1 text-xs text-gray-400">
+                Darf geschätzt sein – ein genauerer Stand lässt sich später unter „Kilometer“ eintragen und ersetzt ihn.
+              </p>
             </div>
           </div>
           <div>
