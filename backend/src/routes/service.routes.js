@@ -9,6 +9,7 @@ router.post('/', sc.createService);
 router.get('/:id', sc.getService);
 router.put('/:id', sc.updateService);
 router.delete('/:id', sc.deleteService);
+router.post('/:id/notify', sc.notifyService);
 
 router.post('/:serviceId/attachments', upload.single('file'), uc.addServiceAttachment);
 router.use('/:serviceId/pdf', pdfRoutes);

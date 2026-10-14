@@ -232,6 +232,14 @@ test('Service-Eintrag benachrichtigt die anderen Zugeordneten (abwählbar)', asy
   r = await api(`/vehicles/${ctx.vid}/services`, { method: 'POST', token: ctx.admin, body: { date: today, mileage: 501, type: 'Reifen', cost: 1, notify: false } });
   assert.equal(r.status, 201);
   assert.equal((await notes(ctx.viewer)).length, base + 1, 'mit notify:false keine Meldung');
+
+  // Nachträglich (erneut) senden, mit eigener Nachricht
+  r = await api(`/vehicles/${ctx.vid}/services/${r.data.id}/notify`, { method: 'POST', token: ctx.admin, body: { message: 'Bitte Druck prüfen' } });
+  assert.equal(r.status, 200);
+  assert.equal(r.data.sent, 1);
+  const last = await notes(ctx.viewer);
+  assert.equal(last.length, base + 2);
+  assert.match(last[0].body, /Bitte Druck prüfen/);
 });
 
 test('Letzter Admin/Besitzer ist geschützt', async () => {

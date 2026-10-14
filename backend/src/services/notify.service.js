@@ -11,7 +11,7 @@ function fmtDate(d) {
 // erledigt wurde - z.B. wenn der Mechaniker den Eintrag anlegt und der
 // Fahrzeugbesitzer informiert werden soll. Fehler beim Senden dürfen das
 // Speichern des Eintrags nie verhindern.
-async function notifyServiceDone({ vehicleId, service, actor }) {
+async function notifyServiceDone({ vehicleId, service, actor, message = '' }) {
   try {
     const vehicle = await prisma.vehicle.findUnique({
       where: { id: vehicleId },
@@ -24,7 +24,9 @@ async function notifyServiceDone({ vehicleId, service, actor }) {
     const body =
       `${vehicle.make} ${vehicle.model} (${vehicle.licensePlate}): ` +
       `${service.type} am ${fmtDate(service.date)} bei ${Number(service.mileage).toLocaleString('de-DE')} km ` +
-      `eingetragen von ${actor.name}.`;
+      `eingetragen von ${actor.name}.` +
+      (message ? `
+${actor.name}: ${message}` : '');
 
     for (const userId of recipients) {
       await prisma.notification.create({

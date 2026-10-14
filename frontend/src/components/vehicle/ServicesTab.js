@@ -37,6 +37,10 @@ export default function ServicesTab({ vehicle, canEdit = true, onVehicleChange }
   // Wie viele andere Personen (außer mir) Zugriff auf das Fahrzeug haben.
   const { user } = useAuth();
   const otherPeople = (vehicle.assignments || []).filter((a) => a.userId !== user?.id).length;
+  // Meldung zu einem bestehenden Eintrag (erneut) senden.
+  const [notifyFor, setNotifyFor] = useState(null);
+  const [notifyMsg, setNotifyMsg] = useState('');
+  const [notifyStatus, setNotifyStatus] = useState({ id: null, text: '', ok: true });
   const [pdfBusy, setPdfBusy] = useState('');
   const [pdfImages, setPdfImages] = useState(true);
 
@@ -94,6 +98,21 @@ export default function ServicesTab({ vehicle, canEdit = true, onVehicleChange }
       setError(err.message);
     } finally {
       setPdfBusy('');
+    }
+  };
+
+  const sendNotify = async (id) => {
+    setNotifyStatus({ id, text: 'Wird gesendet…', ok: true });
+    try {
+      const r = await apiFetch(`/vehicles/${vehicle.id}/services/${id}/notify`, {
+        method: 'POST',
+        body: { message: notifyMsg },
+      });
+      setNotifyStatus({ id, text: `Gesendet an ${r.sent} ${r.sent === 1 ? 'Person' : 'Personen'}.`, ok: true });
+      setNotifyFor(null);
+      setNotifyMsg('');
+    } catch (err) {
+      setNotifyStatus({ id, text: err.message, ok: false });
     }
   };
 
@@ -451,7 +470,39 @@ export default function ServicesTab({ vehicle, canEdit = true, onVehicleChange }
                   Löschen
                 </button>
               )}
+              {canEdit && otherPeople > 0 && (
+                <button onClick={() => setNotifyFor(notifyFor === s.id ? null : s.id)} className="text-brand-600">
+                  Benachrichtigen
+                </button>
+              )}
             </div>
+            {notifyFor === s.id && (
+              <div className="mt-2 space-y-2 rounded-xl bg-brand-50 p-3">
+                <p className="text-xs text-brand-700">
+                  Sendet „Hurra, {s.type} ist erledigt!“ an die anderen Zugeordneten – optional mit eigener Nachricht:
+                </p>
+                <input
+                  className="input"
+                  maxLength={300}
+                  placeholder="z. B. Bitte Bremsen in 2 Wochen prüfen lassen"
+                  value={notifyMsg}
+                  onChange={(e) => setNotifyMsg(e.target.value)}
+                />
+                <div className="flex gap-2">
+                  <button onClick={() => sendNotify(s.id)} className="btn-primary !py-2 text-sm">
+                    Jetzt senden
+                  </button>
+                  <button onClick={() => setNotifyFor(null)} className="btn-secondary !py-2 text-sm">
+                    Abbrechen
+                  </button>
+                </div>
+              </div>
+            )}
+            {notifyStatus.id === s.id && notifyStatus.text && (
+              <p role="status" className={`mt-1 text-xs ${notifyStatus.ok ? 'text-green-700' : 'text-red-600'}`}>
+                {notifyStatus.text}
+              </p>
+            )}
           </div>
         ))}
         {services.length === 0 && <p className="text-sm text-gray-400 text-center py-6">Noch keine Einträge.</p>}

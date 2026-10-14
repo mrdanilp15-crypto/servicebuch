@@ -146,6 +146,26 @@ async function updateService(req, res, next) {
   }
 }
 
+// Meldung zu einem bestehenden Eintrag (erneut) senden - z.B. wenn der Mechaniker
+// nach dem automatischen Hinweis noch etwas ergänzen möchte ("Bitte Bremsen in
+// 2 Wochen prüfen lassen") oder die erste Meldung abgewählt hatte.
+async function notifyService(req, res, next) {
+  try {
+    const { message } = z.object({ message: z.string().trim().max(300).optional() }).parse(req.body || {});
+    const service = await prisma.serviceEntry.findFirst({
+      where: { id: req.params.id, vehicleId: req.params.vehicleId },
+    });
+    if (!service) return res.status(404).json({ error: 'Service-Eintrag nicht gefunden.' });
+    const sent = await notifyServiceDone({ vehicleId: service.vehicleId, service, actor: req.user, message });
+    if (sent === 0) {
+      return res.status(400).json({ error: 'Es ist niemand sonst diesem Fahrzeug zugeordnet, der benachrichtigt werden könnte.' });
+    }
+    res.json({ sent });
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function deleteService(req, res, next) {
   try {
     const attachments = await prisma.attachment.findMany({
@@ -161,4 +181,4 @@ async function deleteService(req, res, next) {
   }
 }
 
-module.exports = { listServices, getService, createService, updateService, deleteService };
+module.exports = { listServices, getService, createService, updateService, deleteService, notifyService };
