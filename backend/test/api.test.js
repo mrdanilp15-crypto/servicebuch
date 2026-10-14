@@ -242,6 +242,20 @@ test('Service-Eintrag benachrichtigt die anderen Zugeordneten (abwählbar)', asy
   assert.match(last[0].body, /Bitte Druck prüfen/);
 });
 
+test('Admin ohne Zuordnung kann Service anlegen und Benachrichtigungen senden', async () => {
+  // Fahrzeug gehört nur dem anderen Nutzer; der Admin ist nicht zugeordnet.
+  const own = await api('/vehicles', { method: 'POST', token: ctx.viewer, body: { licensePlate: 'OWN-1', make: 'A', model: 'B' } });
+  assert.equal(own.status, 201);
+  const vid = own.data.id;
+  const svc = await api(`/vehicles/${vid}/services`, { method: 'POST', token: ctx.admin, body: { date: today, mileage: 10, type: 'Inspektion' } });
+  assert.equal(svc.status, 201);
+  const mine = (await api('/notifications', { token: ctx.viewer })).data.filter((n) => n.vehicleId === vid);
+  assert.equal(mine.length, 1, 'Besitzer wird vom Admin-Eintrag benachrichtigt');
+  const again = await api(`/vehicles/${vid}/services/${svc.data.id}/notify`, { method: 'POST', token: ctx.admin, body: {} });
+  assert.equal(again.status, 200);
+  assert.equal(again.data.sent, 1);
+});
+
 test('Letzter Admin/Besitzer ist geschützt', async () => {
   const me = (await api('/auth/me', { token: ctx.admin })).data.user;
   assert.equal((await api(`/users/${me.id}/role`, { method: 'PUT', token: ctx.admin, body: { role: 'USER' } })).status, 400);
